@@ -147,7 +147,8 @@ class AddressTests(unittest.TestCase):
         srv = Listener()
         self.addCleanup(srv.close)
         self.assertEqual(rc.tcp_probe("127.0.0.1", srv.port), "open")
-        self.assertEqual(rc.tcp_probe("127.0.0.1", free_port(), 2), "refused")
+        # a closed local port can take ~2 s to be refused on Windows servers (CI), so allow plenty of time
+        self.assertEqual(rc.tcp_probe("127.0.0.1", free_port(), 8), "refused")
         self.assertIsNone(rc.tcp_probe(DEAD, 22, 0.3))
 
     def test_no_alternates_returns_main_without_probing(self):
