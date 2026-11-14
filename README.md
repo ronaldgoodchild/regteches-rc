@@ -315,3 +315,7 @@ under the main name.
   (`Set-Item WSMan:\localhost\Client\TrustedHosts -Value <address>`, run as Administrator).
 - Without a saved login, Remote Desktop asks for the password in the normal Windows window.
 - Windows only (uses `mstsc`, PowerShell and DPAPI).
+
+## License
+
+MIT - free to use, change and share. See `LICENSE`. Copyright (c) 2026 Ronald Goodchild (REGTeches).
