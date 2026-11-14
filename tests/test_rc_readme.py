@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("RC_DATA_DIR", tempfile.mkdtemp(prefix="rc_test_readme_"))
 import rc_tools as tools  # noqa: E402
 
-README = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "README.md")
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+README = os.path.join(HERE, "README.md")
 
 
 class InlineTests(unittest.TestCase):
@@ -48,13 +49,43 @@ class BlockTests(unittest.TestCase):
 
     def test_real_readme_converts_cleanly(self):
         with open(README, encoding="utf-8") as f:
-            h = tools.markdown_to_html(f.read(), "RC", "v")
+            h = tools.markdown_to_html(f.read(), "RC", "v", base_dir=HERE)
         outside_code = re.sub(r"<pre.*?</pre>", "", h, flags=re.S)
         self.assertNotIn("**", outside_code)
         self.assertNotIn("`", outside_code)
         self.assertNotIn("\x00", h)
+        self.assertNotIn("![", outside_code)  # every picture reference was understood
         self.assertGreater(h.count("<h2"), 10)
         self.assertIn("<table", h)
+
+
+class PictureTests(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.TemporaryDirectory()
+        os.makedirs(os.path.join(self.d.name, "screenshots"))
+        for n in ("a.png", "tour.mp4"):
+            with open(os.path.join(self.d.name, "screenshots", n), "wb") as f:
+                f.write(b"x")
+
+    def tearDown(self):
+        self.d.cleanup()
+
+    def test_local_picture_and_video_link(self):
+        h = tools.markdown_to_html("[![Tour](screenshots/a.png)](screenshots/tour.mp4)\n", base_dir=self.d.name)
+        self.assertRegex(h, r'<a href="file:///[^"]+tour\.mp4"[^>]*><img src="file:///[^"]+a\.png" alt="Tour"')
+
+    def test_missing_picture_is_dropped_but_alt_text_kept(self):
+        h = tools.markdown_to_html("![Nothing here](screenshots/none.png)\n", base_dir=self.d.name)
+        self.assertNotIn("<img", h)
+        self.assertIn("Nothing here", h)
+
+    def test_no_escaping_the_folder_or_other_schemes(self):
+        h = tools.markdown_to_html("![x](../secret.png) ![y](file:///c:/x.png) [z](javascript:alert(1))", base_dir=self.d.name)
+        self.assertNotIn("<img", h)
+        self.assertNotIn("<a href=\"javascript", h)
+
+    def test_pictures_need_a_base_folder(self):
+        self.assertNotIn("<img", tools.markdown_to_html("![x](screenshots/a.png)"))
 
 
 class NameClashTests(unittest.TestCase):

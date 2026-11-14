@@ -111,12 +111,29 @@ SESSION = (
 
 
 def fake_connect(self, gen, user, password, cols, rows):
-    self.app.post(lambda: self.write_local("Connected.\r\n"))
-    self.app.post(lambda: self.feed(SESSION))
+    # wait for the tab to be laid out so the text uses the real window width, like a real connection would
+    self.app.post(lambda: self.after(600, lambda: (self.write_local("Connected.\r\n"), self.feed(SESSION),
+                                                       self.set_state("● Connected", False))))
 
 
 import rc_terminal
 rc_terminal.TerminalTab.connect = fake_connect
+
+# Believable live status for the FAKE servers (nothing is really probed)
+_DOWN = {"10.50.0.2"}
+_MS = {"10.50.0.1": 1, "10.50.2.20": 2, "10.50.2.53": 3, "10.50.3.10": 2, "10.50.3.11": 4}
+
+
+def fake_status(h, timeout=1.5):
+    a = h["address"]
+    if a == "10.50.4.22":   # reachable only through its alternate (Tailscale) address -> amber dot
+        return {"state": "up", "addr": "100.64.0.22", "ms": 31, "port": 22, "service": True, "via_alt": True}
+    if a in _DOWN:
+        return {"state": "down", "addr": a, "ms": 0, "port": 0, "service": False, "via_alt": False}
+    return {"state": "up", "addr": a, "ms": _MS.get(a, 6), "port": 22, "service": True, "via_alt": False}
+
+
+core.check_host_status = fake_status
 
 # ─── start the real app ─────────────────────────────────────────────────────
 root = tk.Tk()
@@ -203,13 +220,18 @@ def menu_shot(index, name, tour=0.0):
     l, t, r, b = win_box()      # Tk may only be used from this thread, so measure before the helper starts
 
     def grab_then_close():
-        time.sleep(1.2)
+        time.sleep(1.6)
         ImageGrab.grab(bbox=(l, t + 5, r, b), all_screens=True).convert("RGB").save(path)
         key(VK["esc"]); time.sleep(0.15); key(VK["esc"])
 
     root.focus_force()
-    pump(0.3)
+    try:   # make sure Windows really treats this window as the active one, or the Alt key goes elsewhere
+        user32.SetForegroundWindow(user32.GetParent(root.winfo_id()))
+    except Exception:
+        pass
+    pump(1.0)
     key(VK["alt"])
+    time.sleep(0.25)
     for _ in range(index):
         key(VK["right"])
     key(VK["down"])
@@ -226,8 +248,8 @@ def menu_shot(index, name, tour=0.0):
 
 # ─── the tour ───────────────────────────────────────────────────────────────
 app.theme.set_theme("Sky Blue")
-pump(0.8)
-shot("01_home", 1.6)
+pump(3.5)          # let the background status round finish so the dots are coloured
+shot("01_home", 2.2)
 
 pick("web-prod-01")
 shot("02_server_details", 1.8)
@@ -269,6 +291,11 @@ try:
 except Exception as e:
     print("quick connect skipped:", e)
 
+menu_shot(4, "zz_warmup")      # the first menu open after a popup closes is unreliable (focus): throw this one away
+try:
+    os.remove(os.path.join(OUT, "zz_warmup.png"))
+except OSError:
+    pass
 menu_shot(3, "10_servers_menu", 1.8)
 menu_shot(4, "11_tools_menu", 1.8)
 

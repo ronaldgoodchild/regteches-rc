@@ -330,7 +330,7 @@ class TerminalTab(ttk.Frame):
             tr = client.get_transport()
             if tr:
                 tr.set_keepalive(30)  # notices a dead link instead of freezing silently
-            chan = client.invoke_shell(term="xterm-256color", width=cols, height=rows)
+            chan = client.invoke_shell(term="xterm-256color", width=self.cols, height=self.rows)  # latest size: the tab has been laid out by now
         except Exception as e:
             msg = str(e) or e.__class__.__name__
             fatal = isinstance(e, (paramiko.AuthenticationException, paramiko.BadHostKeyException)) or "not trusted" in msg
@@ -375,6 +375,7 @@ class TerminalTab(ttk.Frame):
             self.write_local("Connected.\r\n")
         self.ever_connected, self.attempt = True, 0
         self.set_state("● Connected", False)
+        self.apply_size()
         self.resize_pty()
         self.t.focus_set()
 

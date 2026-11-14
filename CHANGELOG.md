@@ -16,6 +16,9 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 - **Trusted host keys** manager (Tools menu): see and forget saved server keys.
 - **VNC** and **RustDesk** buttons: open your installed VNC viewer or RustDesk straight to the server.
 - **Help > Quick start guide** now opens the README as a formatted web page.
+- **Pictures and a 1-minute tour video** in the README and the guide page (`screenshots\` folder).
+- **MIT license** (`LICENSE`).
+- The SSH terminal now opens at the real window size, so the first lines of a login banner no longer wrap narrow.
 
 **Improved**
 - Logging to `rc.log` (rotating), with timings for slow steps.

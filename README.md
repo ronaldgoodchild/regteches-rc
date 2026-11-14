@@ -2,6 +2,14 @@
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
+![REGTeches RC - Remote Connection Manager](screenshots/00_hero_facebook.png)
+
+**Free and open source (MIT).** SSH terminal, file manager, Remote Desktop, VNC, RustDesk, tunnels and live server status - all in one window.
+
+[![RC tour](screenshots/RC_tour.gif)](screenshots/RC_tour.mp4)
+
+**[▶ Watch the 1-minute video](screenshots/RC_tour.mp4)**
+
 One window for every server you connect to (IP address or DNS name). Add and delete
 servers by mouse, group them, search them, and click the way in you want.
 
@@ -14,6 +22,28 @@ servers by mouse, group them, search them, and click the way in you want.
 A real full-screen SSH terminal with auto-reconnect, live status dots and an Overview home screen, other addresses
 and jump servers, Wake-on-LAN, a trusted-host-keys manager, VNC and RustDesk buttons, and this guide as a web page.
 The full list is in `CHANGELOG.md`. Your servers and saved logins carry over unchanged.
+
+## A look around
+
+**The Overview** - live status dots, favorites and recently used servers.
+
+![The Overview with live status dots](screenshots/01_home.png)
+
+**Every way in, one click** - SSH, Files, Remote Desktop, VNC, RustDesk, Web and more, per server.
+
+![A server's connections](screenshots/03_docker_host_connections.png)
+
+**A real SSH terminal** - full-screen programs, colours, scrollback, auto-reconnect.
+
+![The SSH terminal](screenshots/04_ssh_terminal.png)
+
+**Drag-and-drop file manager** - SFTP, FTP and FTPS.
+
+![The file manager](screenshots/05_file_manager.png)
+
+**Seven colour themes** - pick one with the Colors button.
+
+![Colour themes](screenshots/13_theme_gallery.png)
 
 ## What each button does
 

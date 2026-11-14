@@ -1182,6 +1182,9 @@ class KnownHostsTab(ttk.Frame):
 
 # ─── README as a web page (Help > Quick start guide) ─────────────────────────
 
+_BASE_DIR = None  # folder the README sits in: pictures and files it mentions are looked up there
+
+
 def _inline(text):
     """Markdown inline styles (code, bold, italic, links) -> HTML, with everything else escaped."""
     import html
@@ -1193,7 +1196,27 @@ def _inline(text):
 
     p = re.sub(r"`([^`]+)`", keep, text)  # code spans first, so ** around them still works
     p = html.escape(p, quote=False)
-    p = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2" target="_blank" rel="noopener">\1</a>', p)
+    def target(t):
+        """A web address, or a file next to the README turned into a file:// address; None if it is neither."""
+        if re.match(r"https?://", t):
+            return t
+        if _BASE_DIR and re.fullmatch(r"[\w./%\- ]+", t) and ".." not in t:
+            full = os.path.join(_BASE_DIR, *t.split("/"))
+            if os.path.isfile(full):
+                import pathlib
+                return pathlib.Path(os.path.abspath(full)).as_uri()
+        return None
+
+    def img(m):
+        src = target(m.group(2))
+        return f'<img src="{src}" alt="{m.group(1)}" loading="lazy">' if src else m.group(1)
+
+    def link(m):
+        href = target(m.group(2))
+        return f'<a href="{href}" target="_blank" rel="noopener">{m.group(1)}</a>' if href else m.group(0)
+
+    p = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", img, p)
+    p = re.sub(r"\[((?:[^\[\]]|<img[^>]*>)+)\]\(([^)\s]+)\)", link, p)
     p = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", p)
     p = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", p)
     return re.sub(r"\x00(\d+)\x00", lambda m: codes[int(m.group(1))], p)
@@ -1211,11 +1234,13 @@ def _heading_id(text, used):
 _LIST_ITEM = re.compile(r"^(\s*)([-*+]|\d+\.)\s+(.*)$")
 
 
-def markdown_to_html(md, title="README", subtitle=""):
+def markdown_to_html(md, title="README", subtitle="", base_dir=None):
     """A small Markdown converter for RC's own README: headings, tables, bullet/numbered lists, code blocks,
     rules, paragraphs and inline styles. Returns a complete, self-contained HTML page (light/dark aware,
     with a contents sidebar). No outside files or internet needed."""
     import html
+    global _BASE_DIR
+    _BASE_DIR = base_dir
     lines, body, toc, used = md.splitlines(), [], [], set()
     i = 0
     para = []
@@ -1316,6 +1341,8 @@ nav a{display:block;padding:6px 10px;border-radius:8px;color:var(--text);text-de
 nav a:hover{background:var(--code);color:var(--accent)}
 main{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 36px 36px}
 main>h1:first-child{display:none}
+main img{max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line)}
+p>a>img,p>img:only-child{display:block;margin:1rem auto}
 h2{margin:2.2rem 0 .6rem;padding-bottom:.35rem;border-bottom:2px solid var(--line);color:var(--accent);font-size:1.45rem}
 h3{margin:1.6rem 0 .4rem;color:var(--accent2)}h4{margin:1.2rem 0 .3rem}
 p,li{max-width:80ch}li{margin:.3rem 0}
@@ -1350,7 +1377,7 @@ def open_readme_html(app_dir, title="REGTeches RC", subtitle=""):
     if not os.path.isfile(path):
         return False
     with open(path, "r", encoding="utf-8") as f:
-        page = markdown_to_html(f.read(), title, subtitle)
+        page = markdown_to_html(f.read(), title, subtitle, base_dir=app_dir)
     out = os.path.join(tempfile.gettempdir(), "REGTeches_RC_guide.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)

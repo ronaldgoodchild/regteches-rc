@@ -87,6 +87,7 @@ os.makedirs(PKG, exist_ok=True)
 shutil.copy(exe, os.path.join(PKG, "RC.exe"))
 shutil.copy(os.path.join(SRC, "README.md"), os.path.join(PKG, "README.md"))
 shutil.copy(os.path.join(SRC, "CHANGELOG.md"), os.path.join(PKG, "CHANGELOG.md"))
+shutil.copy(os.path.join(SRC, "LICENSE"), os.path.join(PKG, "LICENSE"))
 with open(os.path.join(HERE, "QUICK_START.txt"), encoding="utf-8") as f:
     quick = f.read().replace("{VERSION}", VER)
 with open(os.path.join(PKG, "QUICK START.txt"), "w", encoding="utf-8") as f:
@@ -101,7 +102,7 @@ if MEDIA and os.path.isdir(MEDIA):
     shots = os.path.join(PKG, "screenshots")
     os.makedirs(shots, exist_ok=True)
     for fn in sorted(os.listdir(MEDIA)):
-        if fn.lower().endswith(".png") and not fn.startswith("theme_"):
+        if fn.lower().endswith((".png", ".gif", ".mp4")) and not fn.startswith("theme_"):
             shutil.copy(os.path.join(MEDIA, fn), shots)
 
 # ─── safety: nothing personal may be in the package ─────────────────────────

@@ -25,3 +25,4 @@ release/dist_pkg/
 release/_tmp_data/
 release/marketing/*.png
 release/marketing/*.gif
+release/marketing/*.mp4

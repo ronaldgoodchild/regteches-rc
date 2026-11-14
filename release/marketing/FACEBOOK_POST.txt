@@ -1,6 +1,6 @@
 =================================================================
  FACEBOOK / SOCIAL POSTS  -  REGTeches Remote Connection Manager v2.0
- Attach: 00_hero_facebook.png  (banner)  and  RC_tour.gif  (animated tour)
+ Attach: 00_hero_facebook.png  (banner), RC_tour.mp4  (1-minute video) or RC_tour.gif  (animated tour)
 =================================================================
 
 ---------- MAIN POST (Facebook page / group) ----------
@@ -11,9 +11,11 @@ Tired of 12 different windows, 6 saved passwords, and "what was that server's IP
 
 RC puts EVERY server, PC and device you connect to in ONE window:
 
-🖥️ SSH terminal tabs - colours, history, copy/paste, saved commands
+🖥️ A real SSH terminal - vim, htop and tmux work, colours, scrollback, auto-reconnect
 📁 Drag-and-drop file manager (SFTP / FTP / FTPS) - this PC on the left, the server on the right
-🖧 Remote Desktop, Web consoles, PowerShell and Ping - one click each
+🖧 Remote Desktop, VNC, RustDesk, Web consoles, PowerShell and Ping - one click each
+🟢 Live status dots on every server + a home Overview
+⏻ Wake-on-LAN, jump servers, and other addresses for Tailscale/ZeroTier
 🔑 One-click SSH key setup for ALL your servers. Type each password once, never again. Keys don't expire.
 🔀 SSH tunnels you can start and stop with a click
 ⌨️ Ctrl+K quick connect - type a few letters, hit Enter
@@ -47,7 +49,7 @@ Body: Every server I own lived in a different tool. So I wrote RC: one window wi
 
 ---------- COMMENT REPLIES TO KEEP HANDY ----------
 
-"Is it free?"            -> Ask me! (decide before posting: free / donation / paid)
+"Is it free?"            -> Yes - free and open source (MIT): github.com/ronaldgoodchild/regteches-rc
 "Does it work on Mac?"   -> Windows only for now (it uses Windows' own Remote Desktop and ssh tools).
 "Is it safe?"            -> Your server list and keys stay on YOUR PC, next to the EXE. Nothing is sent anywhere. Source code is included in the zip.
 "Windows says unsafe!"   -> New unsigned programs trigger SmartScreen: More info > Run anyway. The source is in the zip if you'd like to check it first.

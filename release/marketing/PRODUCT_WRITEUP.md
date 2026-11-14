@@ -5,6 +5,8 @@ Developed by Ronald Goodchild · REGTeches · Jacksonville, FL
 
 ![RC banner](00_hero_facebook.png)
 
+**[▶ Watch the 1-minute tour](RC_tour.mp4)** · Free and open source (MIT) · github.com/ronaldgoodchild/regteches-rc
+
 ---
 
 ## The problem
@@ -21,16 +23,25 @@ If you run a home lab, a small business, or manage servers for clients, you know
 
 | Button | What it does |
 |---|---|
-| **SSH** (green) | Terminal tab inside the window: colours, history, tab-completion, Ctrl+C, copy/paste, search, session logging |
+| **SSH** (green) | A real terminal tab inside the window: vim, nano, htop and tmux work, 256 colours, scrollback, font zoom, search, session logging, auto-reconnect |
 | **Files** (orange) | Two-pane file manager: this PC on the left, the server on the right. SFTP, FTP or FTPS |
 | **Remote Desktop** (blue) | Opens Windows Remote Desktop with the address, port and user filled in |
+| **VNC** (violet) | Opens your installed VNC viewer (TightVNC, RealVNC, UltraVNC, TigerVNC) straight to the machine |
+| **RustDesk** (blue) | Connects through RustDesk by ID or IP address, for PCs that run it |
 | **Web** (teal) | Opens the server's web panel in your browser. A server can have many (Portainer, Plex, Grafana...) |
 | **PowerShell** (indigo) | Remote PowerShell session for Windows servers |
-| **SSH window** (slate) | Full-screen programs such as `nano`, `vim`, `htop` |
+| **SSH window** (slate) | Windows' own `ssh` in a console, if you prefer it |
 | **Mail**, **Shares**, **Ping** | Webmail, Windows network shares, four-ping test |
 | **✔ Check** (red) | Tests DNS and every service on the server and tells you what's up |
 
 ## Feature tour
+
+### ✨ New in 2.0
+* **Live status dots** and an **Overview** home screen: favorites, recently used, and what is not answering
+* **Other addresses** per server (Tailscale, ZeroTier): RC uses the first one that answers
+* **Jump servers**: reach a server through another one
+* **⏻ Wake-on-LAN** button, a **trusted host keys** manager, and a **real full-screen SSH terminal**
+* **VNC** and **RustDesk** buttons, and a built-in **guide** that opens as a web page
 
 ### 🖥️ SSH terminal tabs
 ![SSH terminal](04_ssh_terminal.png)

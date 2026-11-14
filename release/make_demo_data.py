@@ -55,6 +55,24 @@ hosts = [
     host("core-router", "10.50.0.1", "Network", "admin", "Gateway, DHCP, firewall.", "http://10.50.0.1/", "web"),
     host("wifi-controller", "10.50.0.2", "Network", "admin", "Access-point controller.", "https://10.50.0.2:8443/", "web"),
 ]
+import time
+_now = time.time()
+_extra = {
+    "docker-host": {"favorite": True, "last_connected": _now - 600},
+    "web-prod-01": {"favorite": True, "last_connected": _now - 3 * 3600},
+    "nas-main": {"favorite": True, "last_connected": _now - 26 * 3600},
+    "db-prod-01": {"last_connected": _now - 2 * 86400},
+    "office-pc": {"rustdesk_id": "482193760", "mac": "AA:BB:CC:00:11:22", "last_connected": _now - 5 * 86400},
+    "laptop-field": {"alt_addresses": ["100.64.0.22"], "rustdesk_id": "317 842 905"},
+    "nas-backup": {"mac": "AA:BB:CC:33:44:55", "jump_host_name": "docker-host"},
+}
+_by_name = {h["name"]: h for h in hosts}
+for _n, _f in _extra.items():
+    _j = _f.pop("jump_host_name", None)
+    _by_name[_n].update(_f)
+    if _j:
+        _by_name[_n]["jump_host"] = _by_name[_j]["id"]
+
 for h in hosts:
     if h["default_action"] == "rdp":
         h["notes"] += " Remote Desktop ready."
