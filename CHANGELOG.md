@@ -3,6 +3,11 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.0.1
+
+- Help > Quick start guide finds its README and pictures next to the program even when `RC_DATA_DIR` points the data somewhere else (needed for the Scoop install).
+- Install with Scoop: `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc`. Your servers and logins are kept in `scoop\persistc` and survive updates.
+
 ## 2.0
 
 **New**

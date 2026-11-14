@@ -1,4 +1,4 @@
-# REGTeches RC - Remote Connection Manager  v2.0
+# REGTeches RC - Remote Connection Manager  v2.0.1
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
@@ -14,6 +14,8 @@ One window for every server you connect to (IP address or DNS name). Add and del
 servers by mouse, group them, search them, and click the way in you want.
 
 **Help > Quick start guide** shows this whole guide as a formatted web page in your browser (contents list on the left).
+
+**Install with Scoop:** `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc` (updates with `scoop update rc`; your servers are kept between updates).
 
 **Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys) and `rc_theme.py` - keep the five together. First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
 

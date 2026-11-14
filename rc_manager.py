@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.0"
+APP_VERSION = "2.0.1"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
@@ -59,6 +59,9 @@ elif getattr(sys, "frozen", False):  # the .exe: data files live next to it
     APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
+# Where the program itself lives (README, screenshots, license): not the same as the data folder when RC_DATA_DIR is set
+PROGRAM_DIR = (os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, "frozen", False)
+               else os.path.dirname(os.path.abspath(__file__)))
 HOSTS_FILE = os.path.join(APP_DIR, "hosts.json")
 KNOWN_HOSTS = os.path.join(APP_DIR, "known_hosts")
 CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
@@ -2013,12 +2016,12 @@ class App:
         """Help > Quick start guide: README.md shown as a formatted web page in the default browser."""
         try:
             from rc_tools import open_readme_html
-            if open_readme_html(APP_DIR, f"{COMPANY} {APP_NAME}", f"Version {APP_VERSION}  \u00b7  Developed by {AUTHOR}"):
+            if open_readme_html(PROGRAM_DIR, f"{COMPANY} {APP_NAME}", f"Version {APP_VERSION}  \u00b7  Developed by {AUTHOR}"):
                 return
         except Exception:
             log.exception("Could not show the README as a web page")
             for name in ("README.md", "README.txt"):  # fall back to whatever program opens .md files
-                path = os.path.join(APP_DIR, name)
+                path = os.path.join(PROGRAM_DIR, name)
                 if os.path.isfile(path):
                     try:
                         os.startfile(path)

@@ -88,6 +88,19 @@ class PictureTests(unittest.TestCase):
         self.assertNotIn("<img", tools.markdown_to_html("![x](screenshots/a.png)"))
 
 
+class ProgramFolderTests(unittest.TestCase):
+    def test_help_finds_readme_next_to_program_not_in_data_folder(self):
+        import rc_manager as rc
+        with tempfile.TemporaryDirectory() as prog, tempfile.TemporaryDirectory() as data:
+            with open(os.path.join(prog, "README.md"), "w", encoding="utf-8") as f:
+                f.write("# Hi\n\n## Part\n\ntext\n")
+            with mock.patch.object(rc, "PROGRAM_DIR", prog), mock.patch.object(rc, "APP_DIR", data), \
+                    mock.patch.object(tools.webbrowser, "open") as opened, mock.patch.object(rc.messagebox, "showinfo") as info:
+                rc.App.open_readme(mock.Mock())
+            opened.assert_called_once()
+            info.assert_not_called()
+
+
 class NameClashTests(unittest.TestCase):
     def test_key_file_names_still_use_the_original_slug(self):
         # the README converter once shadowed this helper and broke the Keys tab

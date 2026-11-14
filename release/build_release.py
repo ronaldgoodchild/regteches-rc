@@ -88,6 +88,8 @@ shutil.copy(exe, os.path.join(PKG, "RC.exe"))
 shutil.copy(os.path.join(SRC, "README.md"), os.path.join(PKG, "README.md"))
 shutil.copy(os.path.join(SRC, "CHANGELOG.md"), os.path.join(PKG, "CHANGELOG.md"))
 shutil.copy(os.path.join(SRC, "LICENSE"), os.path.join(PKG, "LICENSE"))
+for fn in ("RC-Scoop.cmd", "RC-Scoop.vbs"):   # launchers used by the Scoop bucket (keep data in scoop\persist\rc)
+    shutil.copy(os.path.join(HERE, "scoop", fn), os.path.join(PKG, fn))
 with open(os.path.join(HERE, "QUICK_START.txt"), encoding="utf-8") as f:
     quick = f.read().replace("{VERSION}", VER)
 with open(os.path.join(PKG, "QUICK START.txt"), "w", encoding="utf-8") as f:
@@ -114,7 +116,7 @@ for root_, _, files in os.walk(PKG):
     for fn in files:
         if fn.endswith((".py", ".md", ".txt")):
             text = open(os.path.join(root_, fn), encoding="utf-8", errors="ignore").read()
-            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild", r"tail4b8cdb"):
+            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild(?!/(regteches-rc|scoop-regteches)\b)", r"tail4b8cdb"):  # RC's own public repo and bucket are fine; any other repo name is not
                 assert not re.search(pat, text), f"private detail {pat} found in {fn}"
 
 # ─── zip ────────────────────────────────────────────────────────────────────
