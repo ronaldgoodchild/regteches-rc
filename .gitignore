@@ -1,0 +1,27 @@
+hosts.json
+hosts.json.tmp
+known_hosts
+snippets.json
+logs/
+__pycache__/
+*.pyc
+settings.json
+
+rc.log*
+
+# private data / local state
+hosts.json.*
+terminal.json
+scan_results.json
+scan_targets.txt
+*.corrupt-*
+
+# backups, binaries and build output (rebuild with release\build_release.py)
+*.bak*
+*.exe
+*.zip
+*.broken
+release/dist_pkg/
+release/_tmp_data/
+release/marketing/*.png
+release/marketing/*.gif

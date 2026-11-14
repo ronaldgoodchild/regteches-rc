@@ -1,0 +1,61 @@
+=====================================================================
+  REGTeches  Remote Connection Manager  (RC)  v{VERSION}
+  Developed by Ronald Goodchild
+=====================================================================
+
+WHAT IT IS
+  One window for every server, PC and device you connect to. Add them
+  once, then connect with one click: SSH terminal, SFTP/FTP file
+  manager, Remote Desktop, web consoles, PowerShell, tunnels and more.
+
+START IT
+  1. Unzip this folder anywhere (Desktop, Documents, a USB stick...).
+  2. Double-click  RC.exe
+  Nothing to install. Your servers are saved next to RC.exe, so the
+  whole folder can be copied or moved to another PC.
+
+FIRST 5 MINUTES
+  1. Click  + Add  and type a name and the server's IP or DNS name.
+  2. Pick it from the Server list on the left.
+  3. Click how you want to connect along the top:
+       SSH (green)    terminal tab inside the window
+       Files (orange) two-pane file manager, drag and drop
+       Remote Desktop (blue)   opens Windows mstsc, filled in
+       Web (teal)     opens the server's web page
+  4. Press  Ctrl+K  and start typing a server name for instant search.
+
+STOP TYPING PASSWORDS: ONE-CLICK KEYS
+  Tools > "Set up keys for all servers"  (or the  Keys  button).
+  RC makes one SSH key for this PC and installs it on every server you
+  tick. You type each password once. After that RC logs in with the
+  key. The key never expires.
+  Working from somewhere else (for example over Tailscale)? Run the
+  Keys tab once on that PC too: every PC gets its own key.
+
+MAKE IT YOURS
+  Tools > Color theme: seven themes (three light, two dark, two classic).
+  The button at the top right cycles through them.
+
+FILES THAT RC CREATES NEXT TO RC.EXE
+  hosts.json     your servers (passwords are encrypted for your Windows
+                 account, or use keys and store none)
+  known_hosts    servers you chose to trust
+  settings.json  your colour theme
+  snippets.json  your saved commands
+  Keep these private. Do not post them online.
+
+NEED THE FULL GUIDE?   Open README.md, or Help > Quick start guide.
+
+REQUIREMENTS
+  Windows 10 or 11. Remote Desktop and PowerShell buttons use the
+  tools built into Windows. SSH to a Windows PC needs OpenSSH Server
+  turned on there.
+
+WINDOWS SMARTSCREEN
+  Because RC.exe is a new program from an independent developer,
+  Windows may show "Windows protected your PC". Click More info, then
+  Run anyway. The full source code is in the "source" folder if you
+  want to check it, or run it with Python instead.
+
+(c) 2026 REGTeches - Jacksonville, FL - Developed by Ronald Goodchild
+=====================================================================

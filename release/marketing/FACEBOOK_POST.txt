@@ -1,0 +1,64 @@
+=================================================================
+ FACEBOOK / SOCIAL POSTS  -  REGTeches Remote Connection Manager v2.0
+ Attach: 00_hero_facebook.png  (banner)  and  RC_tour.gif  (animated tour)
+=================================================================
+
+---------- MAIN POST (Facebook page / group) ----------
+
+🚀 NEW from REGTeches: Remote Connection Manager (RC) v2.0
+
+Tired of 12 different windows, 6 saved passwords, and "what was that server's IP again?"
+
+RC puts EVERY server, PC and device you connect to in ONE window:
+
+🖥️ SSH terminal tabs - colours, history, copy/paste, saved commands
+📁 Drag-and-drop file manager (SFTP / FTP / FTPS) - this PC on the left, the server on the right
+🖧 Remote Desktop, Web consoles, PowerShell and Ping - one click each
+🔑 One-click SSH key setup for ALL your servers. Type each password once, never again. Keys don't expire.
+🔀 SSH tunnels you can start and stop with a click
+⌨️ Ctrl+K quick connect - type a few letters, hit Enter
+🎨 7 colour themes - light, dark, and everything bright in between
+
+Built for home labbers, IT techs, and small-business admins who manage real servers. Works great over Tailscale, so your whole lab is one click away from anywhere.
+
+No install. One EXE. Unzip, double-click, done. Windows 10/11.
+
+Made in Jacksonville, FL by Ronald Goodchild - REGTeches.
+
+💬 Want a copy or have a feature idea? Comment below or message me!
+
+#HomeLab #SysAdmin #SSH #SFTP #RemoteDesktop #Tailscale #ITTech #Windows #Selfhosted #REGTeches #Jacksonville
+
+
+---------- SHORT VERSION (Instagram / X / threads) ----------
+
+One window for every server you manage. 🖥️
+SSH tabs • drag-and-drop SFTP • Remote Desktop • tunnels • one-click key setup • 7 colour themes.
+REGTeches Remote Connection Manager v2.0 - one EXE, no install.
+Developed by Ronald Goodchild #HomeLab #SysAdmin #SSH
+
+
+---------- REDDIT-STYLE (r/homelab, r/sysadmin - check each sub's self-promo rules first) ----------
+
+Title: I built a free all-in-one SSH/SFTP/RDP manager for Windows after getting tired of PuTTY + WinSCP + mstsc + a spreadsheet
+
+Body: Every server I own lived in a different tool. So I wrote RC: one window with a server list on the left and tabs on the right. Click a server, then click SSH (terminal tab), Files (WinSCP-style two-pane manager with drag and drop and folder sync), Remote Desktop, Web, PowerShell, Ping or a service check. There is also a bulk SSH-key installer (generates an ed25519 key and installs it on every box you tick), SSH tunnels, saved commands you can run on many servers at once, Ctrl+K quick search, and colour themes. Python/Tkinter + paramiko, single EXE, source included. Feedback welcome.
+
+
+---------- COMMENT REPLIES TO KEEP HANDY ----------
+
+"Is it free?"            -> Ask me! (decide before posting: free / donation / paid)
+"Does it work on Mac?"   -> Windows only for now (it uses Windows' own Remote Desktop and ssh tools).
+"Is it safe?"            -> Your server list and keys stay on YOUR PC, next to the EXE. Nothing is sent anywhere. Source code is included in the zip.
+"Windows says unsafe!"   -> New unsigned programs trigger SmartScreen: More info > Run anyway. The source is in the zip if you'd like to check it first.
+"Does it do VNC/Telnet?" -> Not yet. Tell me what you'd like next!
+
+=================================================================
+POSTING TIPS
+  * Lead with the animated GIF - motion gets 3-5x the attention of a still.
+  * Post between 7-9 PM weeknights or Sunday morning.
+  * Post the banner (00_hero_facebook.png) as the link-preview image.
+  * Reply to every comment in the first hour.
+  * Check the screenshots for anything private before you post (all
+    the demo data is fake: 10.50.x.x addresses, made-up server names).
+=================================================================
