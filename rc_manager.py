@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
