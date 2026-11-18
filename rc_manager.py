@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.1.0"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
@@ -1973,6 +1973,9 @@ class App:
         file_m.add_command(label="Add server…", accelerator="Ctrl+N", command=self.add_host)
         file_m.add_command(label="Import servers from a CSV file…", command=self.import_csv)
         file_m.add_separator()
+        file_m.add_command(label="📤 Export everything to a file…", command=self.export_everything)
+        file_m.add_command(label="📥 Import everything from a file…", command=self.import_everything)
+        file_m.add_separator()
         file_m.add_command(label="Disconnect current tab", accelerator="Ctrl+W", command=self.close_tab)
         file_m.add_command(label="Disconnect all", command=self.disconnect_all)
         file_m.add_command(label="Exit", command=self.on_exit)
@@ -2461,6 +2464,100 @@ class App:
         if skipped:
             messagebox.showwarning("Import", f"Imported {added}. Skipped {len(skipped)} that looked wrong or were "
                                              "duplicates:\n\n" + "\n".join(skipped[:15]) + ("\n…" if len(skipped) > 15 else ""))
+
+    def export_everything(self):
+        """File > Export everything: one .rcpack file to carry servers, tunnels, snippets, settings, trusted host
+        keys (and, protected by a passphrase, saved passwords and SSH keys) to RC on another PC."""
+        import rc_backup
+        phrase = ""
+        if messagebox.askyesno(
+                "Export everything",
+                "Also include your SAVED PASSWORDS and SSH PRIVATE KEYS?\n\n"
+                "They are locked inside the file with a passphrase you choose now, because Windows only lets "
+                "this PC read the passwords RC saved here.\n\nYes = include them     No = servers and settings only",
+                parent=self.root):
+            while True:
+                phrase = simpledialog.askstring("Pack passphrase", "Choose a passphrase for the pack\n"
+                                                "(you will need it to import on the other PC):", show="*", parent=self.root)
+                if phrase is None:
+                    return
+                if len(phrase) < 6:
+                    messagebox.showwarning("Pack passphrase", "Use at least 6 characters.", parent=self.root)
+                    continue
+                again = simpledialog.askstring("Pack passphrase", "Type the passphrase again:", show="*", parent=self.root)
+                if again is None:
+                    return
+                if again == phrase:
+                    break
+                messagebox.showwarning("Pack passphrase", "The two did not match. Try again.", parent=self.root)
+        path = filedialog.asksaveasfilename(
+            title="Export everything", defaultextension=rc_backup.PACK_EXT, initialfile=rc_backup.default_pack_name(),
+            filetypes=[("RC export", "*" + rc_backup.PACK_EXT), ("All files", "*.*")], parent=self.root)
+        if not path:
+            return
+        try:
+            s = rc_backup.export_pack(path, self.hosts, phrase)
+        except Exception as e:
+            log.exception("Export failed")
+            messagebox.showerror("Export everything", f"The export failed:\n{e}", parent=self.root)
+            return
+        extra = (f"\n{s['passwords']} saved password(s) and {s['keys']} SSH key(s) locked with your passphrase."
+                 if phrase else "\nNo passwords or keys were included.")
+        self.status.set(f"Exported {s['servers']} server(s) to {os.path.basename(path)}")
+        messagebox.showinfo("Export everything",
+                            f"Saved {path}\n\n{s['servers']} server(s), {s['tunnels']} tunnel(s), {s['snippets']} snippet(s), "
+                            f"{s['trusted_keys']} trusted host key(s), settings." + extra +
+                            "\n\nOn the other PC: File > Import everything.", parent=self.root)
+
+    def import_everything(self):
+        """File > Import everything: read an .rcpack made by Export everything (this or another PC)."""
+        import rc_backup
+        path = filedialog.askopenfilename(
+            title="Import everything", filetypes=[("RC export", "*" + rc_backup.PACK_EXT), ("All files", "*.*")],
+            parent=self.root)
+        if not path:
+            return
+        try:
+            pack = rc_backup.open_pack(path)
+        except rc_backup.PackError as e:
+            messagebox.showerror("Import everything", str(e), parent=self.root)
+            return
+        ans = messagebox.askyesnocancel(
+            "Import everything",
+            f"{pack.describe()}\n\nYes = MERGE: add new servers and update matching ones, keep everything else here.\n"
+            "No = REPLACE: make this RC look exactly like the pack.\nCancel = stop.\n\n"
+            "Your current files are copied to a backups folder first either way.", parent=self.root)
+        if ans is None:
+            return
+        phrase = ""
+        if pack.has_secrets:
+            phrase = simpledialog.askstring("Pack passphrase", "Passphrase for the saved passwords and keys in this pack\n"
+                                            "(leave empty to import without them):", show="*", parent=self.root) or ""
+        if ans is False and not messagebox.askyesno(
+                "Import everything", "REPLACE removes servers that are not in the pack.\nAre you sure?", parent=self.root):
+            return
+        try:
+            new_hosts, rep = rc_backup.import_pack(pack, self.hosts, "merge" if ans else "replace", phrase)
+        except rc_backup.PackError as e:
+            messagebox.showerror("Import everything", str(e), parent=self.root)
+            return
+        except Exception as e:
+            log.exception("Import failed")
+            messagebox.showerror("Import everything", f"The import failed; nothing was changed in your server list:\n{e}",
+                                 parent=self.root)
+            return
+        self.hosts[:] = new_hosts
+        self.commit()
+        self.status.set(f"Imported: {rep['added']} added, {rep['updated']} updated")
+        msg = (f"Servers: {rep['added']} added, {rep['updated']} updated, {rep['unchanged']} already the same.\n"
+               f"Passwords restored: {rep['passwords']}    SSH keys restored: {rep['keys']}\n"
+               f"Snippets: {rep['snippets']}    Trusted host keys: {rep['known_hosts']}\n\n"
+               f"Previous files saved in:\n{rep['backup']}")
+        if rep["settings"]:
+            msg += "\n\nSettings were imported - restart RC to see the colour theme."
+        if rep["skipped"]:
+            msg += "\n\nSkipped: " + "; ".join(rep["skipped"][:6])
+        messagebox.showinfo("Import everything", msg, parent=self.root)
 
     # menus / clicks
     def on_double(self, e):

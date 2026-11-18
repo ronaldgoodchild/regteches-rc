@@ -3,6 +3,10 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.1.0
+
+- **File > Export everything** and **File > Import everything** (`rc_backup.py`): one `.rcpack` file carries servers, tunnels, snippets, theme, terminal settings and trusted host keys to RC on another PC. Optional passphrase adds saved passwords and SSH keys, locked inside the file. Import can merge or replace and always backs up your current files first.
+
 ## 2.0.2
 
 - Built with the current libraries: paramiko 5.1 (SSH/SFTP) and pyte 0.8.2 (terminal emulator). No feature changes.
@@ -10,7 +14,8 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 ## 2.0.1
 
 - Help > Quick start guide finds its README and pictures next to the program even when `RC_DATA_DIR` points the data somewhere else (needed for the Scoop install).
-- Install with Scoop: `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc`. Your servers and logins are kept in `scoop\persistc` and survive updates.
+- Install with Scoop: `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc`. Your servers and logins are kept in `scoop\persist
+c` and survive updates.
 
 ## 2.0
 

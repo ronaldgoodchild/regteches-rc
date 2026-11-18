@@ -1,4 +1,4 @@
-# REGTeches RC - Remote Connection Manager  v2.0.2
+# REGTeches RC - Remote Connection Manager  v2.1.0
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
@@ -17,7 +17,7 @@ servers by mouse, group them, search them, and click the way in you want.
 
 **Install with Scoop:** `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc` (updates with `scoop update rc`; your servers are kept between updates).
 
-**Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys) and `rc_theme.py` - keep the five together. First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
+**Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys), `rc_backup.py` (export / import everything) and `rc_theme.py` - keep the six together. First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
 
 ## What's new in 2.0
 
@@ -129,6 +129,14 @@ They use the server's saved login or key and stop when you close RC. Example: Lo
 Saved commands. **Run on any servers you pick** (or a whole group): RC connects to each with its saved login/key
 and shows the result per server. In an SSH terminal tab the **Snippets** menu types one into the session. The SSH
 terminal also has **Find** (search the output) and **Log to file** (saved in the `logs` folder, no colour codes).
+
+## Export and import everything (move RC to another PC)
+
+**File > Export everything to a file** writes one `.rcpack` file with all your servers (groups, extra connections, tunnels, bookmarks, favorites, notes), snippets, colour theme and terminal settings, and the trusted SSH host keys.
+
+Saved passwords and SSH private keys are only included if you choose a **pack passphrase**. Windows locks the passwords RC saves to one user on one PC, so RC unlocks them while exporting and locks them again inside the pack with your passphrase. Without a passphrase no password or key is written. Keep the file and the passphrase private.
+
+On the other PC: **File > Import everything from a file**. Pick **Merge** (add new servers, update matching ones, keep everything else) or **Replace** (make RC look exactly like the pack). Passwords are saved again for the new PC, SSH keys go into that PC's `.ssh` folder (an existing key is never overwritten), and your old files are first copied to a `backups` folder next to RC. Restart RC afterwards to see the imported colour theme.
 
 ## Import
 
