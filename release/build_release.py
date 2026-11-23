@@ -18,6 +18,9 @@ os.environ["RC_DATA_DIR"] = os.path.join(HERE, "_tmp_data")   # importing rc_man
 import rc_manager  # noqa: E402
 
 VER = rc_manager.APP_VERSION
+# every RC module (rc_manager.py is the entry point); the build and the source/ folder in the zip both use this list
+MODULES = ['rc_tools', 'rc_files', 'rc_theme', 'rc_terminal', 'rc_backup', 'rc_glances', 'rc_identity', 'rc_import', 'rc_localsrv', 'rc_monitor', 'rc_netscan', 'rc_notes', 'rc_prefs', 'rc_quick', 'rc_record', 'rc_transport', 'rc_zmodem']
+
 NAME = f"REGTeches_RC_v{VER}"
 import tempfile
 WORK = os.path.join(tempfile.gettempdir(), "rc_build_work")   # outside OneDrive: its sync locks build folders
@@ -67,8 +70,7 @@ cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile
        "--name", "RC", "--icon", ico, "--version-file", version_txt,
        "--distpath", os.path.join(WORK, "dist"), "--workpath", os.path.join(WORK, "work"), "--specpath", WORK,
        "--paths", SRC,
-       "--hidden-import", "rc_tools", "--hidden-import", "rc_files", "--hidden-import", "rc_theme",
-       "--hidden-import", "rc_terminal", "--hidden-import", "rc_backup", "--hidden-import", "pyte", "--hidden-import", "wcwidth",
+       *[a for m in MODULES for a in ("--hidden-import", m)], "--hidden-import", "serial", "--hidden-import", "pyte", "--hidden-import", "wcwidth",
        "--hidden-import", "paramiko", "--hidden-import", "cryptography", "--hidden-import", "PIL",
        os.path.join(SRC, "rc_manager.py")]
 print(" ".join(cmd))
@@ -98,7 +100,7 @@ with open(os.path.join(PKG, "requirements-source.txt"), "w") as f:
     f.write("# Only needed to run the source code instead of RC.exe\nparamiko>=3.4\npyte>=0.8\ncryptography\n")
 src_dir = os.path.join(PKG, "source")
 os.makedirs(src_dir, exist_ok=True)
-for fn in ("rc_manager.py", "rc_files.py", "rc_tools.py", "rc_theme.py", "rc_terminal.py", "rc_backup.py", "RC.bat"):
+for fn in ["rc_manager.py"] + [m + ".py" for m in MODULES] + ["RC.bat"]:
     shutil.copy(os.path.join(SRC, fn), src_dir)
 if MEDIA and os.path.isdir(MEDIA):
     shots = os.path.join(PKG, "screenshots")

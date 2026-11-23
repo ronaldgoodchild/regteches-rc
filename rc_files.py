@@ -24,6 +24,54 @@ def stamp(mtime):
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)) if mtime else ""
 
 
+def breadcrumb_segments(path, backend, limit=7):
+    """[(label, full_path)] from the root down to `path`, using the backend's own rules (so it works for both / and C:\\).
+    A long path keeps its last `limit` pieces and starts with an ellipsis entry that goes to the first one dropped."""
+    if path and backend.parent(path) != path:
+        path = path.rstrip("/\\") or path            # '/home/ron/' and '/home/ron' are the same place
+    out, cur = [], path
+    while cur:
+        par = backend.parent(cur)
+        label = cur if par == cur else (cur.rstrip("/\\").replace("\\", "/").rsplit("/", 1)[-1] or cur)
+        out.append((label, cur))
+        if par == cur:
+            break
+        cur = par
+    out.reverse()
+    if len(out) > limit:
+        out = [("…", out[-limit - 1][1])] + out[-limit:]
+    return out
+
+
+def unique_name(name, existing, marker="copy"):
+    """'a.txt' -> 'a (copy).txt' -> 'a (copy 2).txt' ... the first one not in `existing` (case-insensitive)."""
+    taken = {e.lower() for e in existing}
+    if name.lower() not in taken:
+        return name
+    stem, dot, ext = name.rpartition(".")
+    if not dot or not stem:
+        stem, ext = name, ""
+    else:
+        ext = "." + ext
+    n = 1
+    while True:
+        cand = f"{stem} ({marker}{'' if n == 1 else ' ' + str(n)}){ext}"
+        if cand.lower() not in taken:
+            return cand
+        n += 1
+
+
+def sort_entries(entries, col="name", reverse=False, show_hidden=True, needle=""):
+    """Folders first, then files; both ordered by the chosen column (folders by name unless sorting by name). Optional name
+    filter and hiding of dot-files."""
+    needle = (needle or "").lower()
+    rows = [e for e in entries if (show_hidden or not e[0].startswith(".")) and (not needle or needle in e[0].lower())]
+    key = {"name": lambda e: e[0].lower(), "size": lambda e: (e[2], e[0].lower()), "modified": lambda e: (e[3], e[0].lower())}[col]
+    dirs = sorted((e for e in rows if e[1]), key=(key if col == "name" else (lambda e: e[0].lower())), reverse=(reverse and col == "name"))
+    files = sorted((e for e in rows if not e[1]), key=key, reverse=reverse)
+    return dirs + files
+
+
 # ─── this PC ─────────────────────────────────────────────────────────────────
 
 class LocalBackend:
@@ -35,8 +83,9 @@ class LocalBackend:
 
     @staticmethod
     def parent(path):
-        p = os.path.dirname(path.rstrip("\\/"))
-        return p or path
+        stripped = path.rstrip("\\/")
+        p = os.path.dirname(stripped)
+        return path if (not p or p == stripped) else p      # a drive or share root is its own parent (not "C:", which means "the current folder on C")
 
     def home(self):
         return os.path.expanduser("~")
@@ -61,6 +110,12 @@ class LocalBackend:
 
     def mkdir(self, path):
         os.mkdir(path)
+
+    def touch(self, path):
+        open(path, "x").close()
+
+    def copy(self, src, dst, is_dir):
+        (shutil.copytree if is_dir else shutil.copy2)(src, dst)
 
     def ensure_dir(self, path):
         os.makedirs(path, exist_ok=True)
@@ -201,14 +256,17 @@ class Pane(ttk.Frame):
         e = ttk.Entry(bar2, textvariable=self.path_var)
         e.pack(side="left", fill="x", expand=True)
         e.bind("<Return>", lambda _: self.cd(self.path_var.get()))
+        self.crumbs = ttk.Frame(self)           # a clickable trail: click any folder in the path to go there
+        self.crumbs.pack(fill="x")
+        self.sort_col, self.sort_rev = "name", False
+        self.show_hidden = tk.BooleanVar(value=True)
         self.filter_var = tk.StringVar()
         ttk.Label(bar2, text="🔍").pack(side="left", padx=(6, 0))
         ttk.Entry(bar2, textvariable=self.filter_var, width=12).pack(side="left")
         self.filter_var.trace_add("write", lambda *_: self.render())
         self.tree = ttk.Treeview(self, columns=("size", "modified"), selectmode="extended", height=14)
-        self.tree.heading("#0", text="Name")
-        self.tree.heading("size", text="Size")
-        self.tree.heading("modified", text="Modified")
+        for col, key in (("#0", "name"), ("size", "size"), ("modified", "modified")):
+            self.tree.heading(col, text={"name": "Name", "size": "Size", "modified": "Modified"}[key], command=lambda k=key: self.sort_by(k))
         self.tree.column("#0", width=230)
         self.tree.column("size", width=70, anchor="e")
         self.tree.column("modified", width=115)
@@ -222,6 +280,13 @@ class Pane(ttk.Frame):
         self.tree.bind("<Return>", self.on_open)
         self.tree.bind("<BackSpace>", lambda e: self.up())
         self.tree.bind("<Delete>", lambda e: tab.delete())
+        self.tree.bind("<Button-3>", self.context_menu)
+        self.tree.bind("<Control-a>", lambda e: (self.tree.selection_set(self.tree.get_children()), "break")[1])
+        self.tree.bind("<Control-c>", lambda e: (tab.clip_set(self, cut=False), "break")[1])
+        self.tree.bind("<Control-x>", lambda e: (tab.clip_set(self, cut=True), "break")[1])
+        self.tree.bind("<Control-v>", lambda e: (tab.paste(self), "break")[1])
+        self.tree.bind("<FocusIn>", lambda e: setattr(tab, "focus_pane", self))
+        self.tree.bind("<Button-1>", lambda e: setattr(tab, "focus_pane", self), add="+")
         self.tree.bind("<ButtonPress-1>", self.drag_start)
         self.tree.bind("<B1-Motion>", self.drag_move)
         self.tree.bind("<ButtonRelease-1>", self.drag_end)
@@ -266,13 +331,40 @@ class Pane(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         self.entries = {}
         flt = self.filter_var.get().lower()
-        for e in sorted(self.raw, key=lambda e: (not e[1], e[0].lower())):
-            if flt and flt not in e[0].lower():
-                continue
+        for e in sort_entries(self.raw, self.sort_col, self.sort_rev, self.show_hidden.get(), flt):
             iid = self.tree.insert("", "end", text=("📁 " if e[1] else "📄 ") + e[0],
                                    values=("" if e[1] else core.fmt_size(e[2]), stamp(e[3])))
             self.entries[iid] = e
-        self.status.set(f"{len(self.raw)} items" + (f" ({len(self.entries)} shown)" if flt else ""))
+        hidden = self.show_hidden.get()
+        self.status.set(f"{len(self.raw)} items" + (f" ({len(self.entries)} shown)" if flt or not hidden else ""))
+        for col, key, label in (("#0", "name", "Name"), ("size", "size", "Size"), ("modified", "modified", "Modified")):
+            self.tree.heading(col, text=label + ((" ▼" if self.sort_rev else " ▲") if key == self.sort_col else ""))
+        self.render_crumbs()
+
+    def render_crumbs(self):
+        for w in self.crumbs.winfo_children():
+            w.destroy()
+        if not self.path or self.backend is None:
+            return
+        for label, full in breadcrumb_segments(self.path, self.backend):
+            b = ttk.Button(self.crumbs, text=label, style="Toolbutton", command=lambda p=full: self.cd(p))
+            b.pack(side="left")
+            ttk.Label(self.crumbs, text="›", foreground="#888").pack(side="left")
+
+    def sort_by(self, key):
+        self.sort_rev = not self.sort_rev if key == self.sort_col else False
+        self.sort_col = key
+        self.render()
+
+    def context_menu(self, e):
+        """Right-click: select the row under the pointer (unless it is already part of the selection), then the menu."""
+        iid = self.tree.identify_row(e.y)
+        if iid and iid not in self.tree.selection():
+            self.tree.selection_set(iid)
+        self.tab.focus_pane = self
+        m = self.tab.build_context_menu(self)
+        self.tab.app.theme.paint(m) if hasattr(self.tab.app, "theme") else None
+        m.tk_popup(e.x_root, e.y_root)
 
     def refresh(self):
         self.cd(self.path or self.backend.home(), push=False, quiet=True)
@@ -381,6 +473,9 @@ class FilesTab(ttk.Frame):
         self.rlock, self.xlock = threading.Lock(), threading.Lock()
         self.remote_backend = self.xb = None
         self.jobs, self.qlock, self.wake = [], threading.Lock(), threading.Event()
+        self.go = threading.Event()          # set = the queue may start the next job; cleared by Pause
+        self.go.set()
+        self.clip = None                     # {"side", "dir", "items": [entries], "cut": bool}
         self.worker = None
         self.tmp = tempfile.mkdtemp(prefix="rc_edit_")
         self.policy = tk.StringVar(value="Overwrite if newer")
@@ -512,6 +607,155 @@ class FilesTab(ttk.Frame):
             b = pane.backend
             self.call(pane, "Creating folder ...", lambda: b.mkdir(b.join(pane.path, name.strip())), lambda _: pane.refresh())
 
+    # new file, clipboard, paths ---------------------------------------------
+    def new_file(self):
+        pane = self.active()
+        name = simpledialog.askstring("New file", "File name:", parent=self)
+        if name and name.strip():
+            b = pane.backend
+            self.call(pane, "Creating file ...", lambda: b.touch(b.join(pane.path, name.strip())), lambda _: pane.refresh())
+
+    def clip_set(self, pane, cut=False):
+        sel = pane.selected()
+        if not sel:
+            return False
+        self.clip = {"side": pane.side, "dir": pane.path, "items": sel, "cut": cut}
+        pane.status.set(f"{'Cut' if cut else 'Copied'} {len(sel)} item(s): paste with Ctrl+V or right-click > Paste here")
+        return True
+
+    def paste(self, pane):
+        """Paste what was copied/cut. Same side (server to server, PC to PC): done in place, with a new name if it exists.
+        Other side: queued as an upload / download."""
+        clip = self.clip
+        if not clip or pane.backend is None:
+            return False
+        src_pane = self.local if clip["side"] == "local" else self.remote
+        if clip["side"] != pane.side:
+            self.transfer(src_pane, pane, pane.path, move=clip["cut"], items=clip["items"], src_dir=clip["dir"])
+            if clip["cut"]:
+                self.clip = None
+            return True
+        b, dst_dir, items, cut = pane.backend, pane.path, clip["items"], clip["cut"]
+        if cut and clip["dir"] == dst_dir:
+            return False                                           # moving into the folder it is already in
+
+        def work():
+            with_names = {e[0] for e in b.listdir(dst_dir)}
+            done = 0
+            for name, is_dir, _size, _mtime in items:
+                src = b.join(clip["dir"], name)
+                new = name if cut and name not in with_names else unique_name(name, with_names)
+                if cut and name in with_names:
+                    raise OSError(f"“{name}” already exists in {dst_dir}")
+                dst = b.join(dst_dir, new)
+                if cut:
+                    b.rename(src, dst)
+                else:
+                    b.copy(src, dst, is_dir)
+                with_names.add(new)
+                done += 1
+            return done
+
+        def finished(n):
+            if cut:
+                self.clip = None
+            self.app.status.set(f"{'Moved' if cut else 'Copied'} {n} item(s)")
+            pane.refresh()
+        self.call(pane, "Pasting ...", work, finished)
+        return True
+
+    def paths_text(self, pane, quote=False):
+        """The full path of each selected item (or of the current folder when nothing is selected), one per line."""
+        import shlex
+        sel = pane.selected()
+        paths = [pane.backend.join(pane.path, e[0]) for e in sel] or [pane.path]
+        return "\n".join(shlex.quote(p) if quote else p for p in paths)
+
+    def copy_path(self, pane):
+        self.clipboard_clear()
+        self.clipboard_append(self.paths_text(pane))
+        pane.status.set("Path copied to the clipboard")
+
+    def terminals_for_server(self):
+        fn = getattr(self.app, "all_terminals", None)
+        hid = self.src.get("id")
+        return [t for t in (fn() if fn else []) if t.host.get("_src", t.host).get("id") == hid and t.kind == "ssh"]
+
+    def path_to_terminal(self, pane):
+        """Type the selected path(s) (quoted for the shell, no Enter) into this server's open SSH terminal."""
+        terms = self.terminals_for_server()
+        if not terms:
+            messagebox.showinfo("Files", "Open an SSH terminal tab for this server first.", parent=self)
+            return False
+        text = " ".join(self.paths_text(pane, quote=True).split("\n"))
+        terms[0].send_user(text + " ")
+        pane.status.set("Path typed into the terminal")
+        return True
+
+    def build_context_menu(self, pane):
+        m = tk.Menu(self, tearoff=0)
+        sel = pane.selected()
+        one = len(sel) == 1
+        other = "server" if pane.side == "local" else "this PC"
+        if sel:
+            if one and not sel[0][1]:
+                m.add_command(label="✎ Edit  F4", command=lambda: self.edit(pane))
+                m.add_command(label="↗ Open with its program", command=lambda: self.open_external(pane))
+            m.add_command(label=f"Copy to {other}  F5", command=lambda: self.transfer(pane, self.remote if pane is self.local else self.local,
+                                                                                       (self.remote if pane is self.local else self.local).path))
+            m.add_command(label=f"Move to {other}  F6", command=lambda: self.transfer(pane, self.remote if pane is self.local else self.local,
+                                                                                       (self.remote if pane is self.local else self.local).path, move=True))
+            m.add_separator()
+            m.add_command(label="Copy  Ctrl+C", command=lambda: self.clip_set(pane, False))
+            m.add_command(label="Cut  Ctrl+X", command=lambda: self.clip_set(pane, True))
+        paste = tk.NORMAL if self.clip else tk.DISABLED
+        m.add_command(label="Paste here  Ctrl+V", command=lambda: self.paste(pane), state=paste)
+        m.add_separator()
+        if one:
+            m.add_command(label="Rename  F2", command=self.rename)
+        m.add_command(label="📁 New folder  F7", command=self.mkdir)
+        m.add_command(label="📄 New file", command=self.new_file)
+        if sel:
+            m.add_command(label="🗑 Delete  F8", command=self.delete)
+            m.add_command(label="🔒 Properties", command=self.properties)
+        m.add_separator()
+        m.add_command(label="Copy path", command=lambda: self.copy_path(pane))
+        if pane.side == "remote":
+            m.add_command(label="Type path into the SSH terminal", command=lambda: self.path_to_terminal(pane),
+                          state=tk.NORMAL if self.terminals_for_server() else tk.DISABLED)
+        m.add_separator()
+        m.add_command(label="Select all  Ctrl+A", command=lambda: pane.tree.selection_set(pane.tree.get_children()))
+        m.add_checkbutton(label="Show hidden files (.name)", variable=pane.show_hidden, command=pane.render)
+        m.add_command(label="⟳ Refresh", command=pane.refresh)
+        return m
+
+    def toggle_pause(self):
+        if self.go.is_set():
+            self.go.clear()
+            self.pause_btn.configure(text="▶ Resume")
+        else:
+            self.go.set()
+            self.pause_btn.configure(text="⏸ Pause")
+            self.wake.set()
+        self.update_qstatus()
+
+    def retry_failed(self):
+        """Put every failed transfer back in the queue (the ones that finished are left alone)."""
+        again = []
+        with self.qlock:
+            for j in self.jobs:
+                if j["state"] == "error":
+                    j.update(state="queued", error="", done=0, cancel=threading.Event())
+                    again.append(j)
+        for j in again:
+            self.paint(j)
+        if again:
+            if self.worker is None or not self.worker.is_alive():
+                self.worker = threading.Thread(target=self.work_queue, daemon=True)
+                self.worker.start()
+            self.wake.set()
+        return len(again)
+
     def properties(self):
         pane = self.active()
         sel = pane.selected()
@@ -575,16 +819,17 @@ class FilesTab(ttk.Frame):
                 src, dst = other, src
         self.transfer(src, dst, dst.path, move=move)
 
-    def transfer(self, src, dst, dest_dir, move=False):
-        sel = src.selected()
+    def transfer(self, src, dst, dest_dir, move=False, items=None, src_dir=None):
+        sel = items if items is not None else src.selected()
+        base = src_dir or src.path
         if not sel or src is dst or self.remote.backend is None:
             return
         for name, is_dir, size, mtime in sel:
             if src.side == "local":
-                s, d = src.backend.join(src.path, name), posixpath.join(dest_dir, name)
+                s, d = src.backend.join(base, name), posixpath.join(dest_dir, name)
                 self.enqueue("upd" if is_dir else "up", s, d, name=name, size=size, mtime=mtime, move=move)
             else:
-                s, d = posixpath.join(src.path, name), os.path.join(dest_dir, name)
+                s, d = posixpath.join(base, name), os.path.join(dest_dir, name)
                 self.enqueue("downd" if is_dir else "down", s, d, name=name, size=size, mtime=mtime, move=move)
 
     # edit -------------------------------------------------------------------
@@ -682,6 +927,9 @@ class FilesTab(ttk.Frame):
         ttk.Button(top, text="Cancel selected", command=self.cancel_selected).pack(side="left")
         ttk.Button(top, text="Cancel all", command=self.cancel_all).pack(side="left", padx=4)
         ttk.Button(top, text="Clear finished", command=self.clear_finished).pack(side="left")
+        self.pause_btn = ttk.Button(top, text="⏸ Pause", command=self.toggle_pause)
+        self.pause_btn.pack(side="left", padx=4)
+        ttk.Button(top, text="↻ Retry failed", command=self.retry_failed).pack(side="left")
         ttk.Label(top, text="   If a file already exists:").pack(side="left")
         ttk.Combobox(top, textvariable=self.policy, state="readonly", width=20,
                      values=["Overwrite if newer", "Overwrite", "Skip", "Ask"]).pack(side="left", padx=4)
@@ -708,7 +956,8 @@ class FilesTab(ttk.Frame):
         with self.qlock:
             waiting = sum(1 for j in self.jobs if j["state"] in ("queued", "running"))
             failed = sum(1 for j in self.jobs if j["state"] == "error")
-        self.qstatus.set((f"{waiting} waiting" if waiting else "idle") + (f", {failed} failed" if failed else ""))
+        self.qstatus.set((f"{waiting} waiting" if waiting else "idle") + (f", {failed} failed" if failed else "")
+                         + ("  (paused)" if not self.go.is_set() else ""))
 
     def paint(self, job):
         if self.closed or not self.q.exists(job["id"]):
@@ -757,6 +1006,9 @@ class FilesTab(ttk.Frame):
 
     def work_queue(self):
         while not self.closed:
+            while not self.go.wait(0.5):             # Pause: finish the current job, hold the rest
+                if self.closed:
+                    return
             with self.qlock:
                 job = next((j for j in self.jobs if j["state"] == "queued"), None)
             if job is None:

@@ -3,9 +3,126 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.12.0
+
+**New**
+- **Preferences** (`rc_prefs.py`, Tools > Preferences): confirm before exiting, reopen last session's tabs, server check interval,
+  Stats interval, interface size, and a shortcut list.
+- **Tab management:** lock a tab, close others / right / left, drag to reorder, **Ctrl+1-9**, **Ctrl+Tab**, **Ctrl+Shift+D**.
+- RC remembers the open SSH / Files / Stats / Telnet / Serial tabs on exit (optional) and reopens them on the next start.
+
+**Fixed**
+- The background status check ignored a server's proxy, so servers reachable only through a proxy always showed red.
+
+## 2.11.0
+
+**New**
+- **Zmodem** (`rc_zmodem.py`): `sz` on the server downloads into a folder you choose, `rz` (or the right-click menu's Upload
+  files with Zmodem) uploads files you pick. Cancel button, progress in the status bar, no overwriting, safe file names,
+  automatic re-send of damaged blocks. Tested against the real lrzsz `sz` and `rz` as well as against itself.
+- **Clear screen (keep scrollback)** in the terminal's right-click menu.
+
+## 2.10.0
+
+**New (file manager)**
+- A **right-click menu** with Copy / Cut / Paste here (on the server, copies run on the server itself), New file, Copy path,
+  Type path into the SSH terminal, Select all and Show hidden files.
+- A **clickable path trail**, **sortable columns**, Ctrl+A / C / X / V.
+- Transfer queue **Pause / Resume** and **Retry failed**.
+
+**Fixed**
+- The PC pane's Up button on a drive root (C:) went to the current folder on that drive; it now stays at the root.
+- Stats no longer hammers a server that is refusing logins: after a failure it waits 2x, 4x, 8x ... the refresh interval (up to a minute)
+  and says when it will try again.
+- Stats from Glances no longer rebuilds a TLS certificate store on every refresh (it was slow and only needed for https).
+
+## 2.9.0
+
+**New**
+- **Glances support for Stats** (`rc_glances.py`): a per-server "Use Glances" setting (Edit > Glances, with port, login, https and a
+  Detect / test button) makes the Stats tab read Glances' REST API instead of using SSH, so PCs and servers without an SSH login
+  (including Windows) can be monitored. Adds a Containers tab and sensor temperatures. Tried against Glances 4.5.9.
+- The Network scan recognises Glances (port 61208) and ticks it when you add the machine as a server.
+
+## 2.8.0
+
+**New**
+- **Session recording and playback** (`rc_record.py`): ⏺ Record on every terminal saves an asciicast `.cast` file; Tools > Play a
+  terminal recording has play / pause / speed / seek / skip long pauses.
+- **Notes** (`rc_notes.py`, Tools > Notes): tagged Markdown notes, optionally attached to a server, searchable, in backups.
+- **Import from MobaXterm and Xshell** (`rc_import.py`, File > Import servers).
+
+**Changed**
+- A server's right-click menu is shorter: the less-used connections (ping, wake, mail, shares ...) are in a "More" submenu,
+  and it has a Notes… entry.
+
+## 2.7.0
+
+**New**
+- **Encrypted backup and restore** (`rc_backup.py`, File > Backup): one password-locked file with servers (and their saved
+  passwords, re-encrypted for the new PC on restore), snippets, workspaces, identities, proxies and trusted host keys.
+- **Network scan** (`rc_netscan.py`, Tools > Network): find machines and their open ports on a network, with names, MACs,
+  "already in RC" marks and one-click Add as server.
+- **Local servers** (`rc_localsrv.py`, Tools > Network): temporary TFTP (read, optional uploads) and read-only HTTP servers
+  with a request log and an auto-stop timer.
+
+## 2.6.0
+
+**New**
+- **Telnet and Serial (COM port) terminals** (`rc_transport.py`): add them as a server's More connections; own Telnet
+  client with option negotiation and window size, serial with speed / frame / flow-control settings and a port list.
+- **Terminal colour schemes** (8), **font** choice, **copy on select**, **right-click paste**, **middle-click paste** and
+  **Save output to a file**.
+
+**Changed**
+- **The Add / Edit server form is split into tabs** (General, Login, Connections, Network, More connections, After login)
+  so it fits small screens; the buttons stay at the top.
+- The Connect buttons are on two lines (Connect / More), and Telnet / Serial buttons only show for servers that have one.
+- `pyserial` is now a requirement (for Serial).
+
+## 2.5.0
+
+**New**
+- **⚡ Quick commands and History panel** on every SSH terminal (`rc_quick.py`): grouped snippets with Run / Paste / Copy,
+  searchable history of what you typed (never passwords, full-screen programs or edited lines; switch-off and clear
+  available), save a history entry as a quick command. Snippets can have a Group. `history.json`.
+- **After-login script** per server: `wait-for-text => what to type` steps run after every connect (with `${user}`,
+  `${host}`, `${password}`), stopping with a message if a step does not appear in 10 s.
+- **Multi-line paste check:** pasting several lines asks first (and says how many other Broadcast terminals get it).
+
+## 2.4.0
+
+**New**
+- **Identities** (`rc_identity.py`, Tools > Credentials): reusable logins (password, key file or agent) that servers
+  can share; a server's "Saved login" replaces its own username, password and key. `identities.json`.
+- **Proxies** (Tools > Network): SOCKS5 and HTTP CONNECT proxies, with a Test button. SSH, SFTP, tunnels, Stats, snippets,
+  key setup and the status dot go through the server's proxy. `proxies.json`.
+
+## 2.3.0
+
+**New**
+- **Workspaces:** save a split view (its servers and layout) under a name and reopen it in one click (Session menu, or
+  💾 in the split view). `workspaces.json`.
+- **Stats: process details and signals** (TERM / HUP / INT / KILL, always confirmed), **Services** tab (systemd: state,
+  start / stop / restart / enable / disable, journal log) and **System** tab (OS, CPU, clock difference from this PC,
+  interfaces with MAC / speed / addresses, disks).
+
+## 2.2.0
+
+**New**
+- **📊 Stats** button (`rc_monitor.py`): live CPU, memory, network, disks, processes and listening ports of a Linux/NAS
+  server over one SSH connection, with graphs, sortable/filterable process list and automatic reconnect. Read-only.
+
 ## 2.1.0
 
-- **File > Export everything** and **File > Import everything** (`rc_backup.py`): one `.rcpack` file carries servers, tunnels, snippets, theme, terminal settings and trusted host keys to RC on another PC. Optional passphrase adds saved passwords and SSH keys, locked inside the file. Import can merge or replace and always backs up your current files first.
+**New**
+- **Split view** (Session menu): several SSH terminals tiled in one tab, with grid / side-by-side / stacked layouts and pane zoom.
+- **Broadcast input**: type or paste once and send it to every ticked terminal (split panes and ordinary tabs).
+- **Duplicate session**, **Rename tab**, **Duplicate server** and **Export servers to CSV**; **Help > Keyboard shortcuts**.
+
+**Changed**
+- Menu bar reorganised: File (server list actions, Import/Export), Connect, Servers, Session, View, Tools (Network and
+  Credentials submenus), Help. The tab right-click menu is built per tab.
 
 ## 2.0.2
 

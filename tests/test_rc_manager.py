@@ -235,8 +235,8 @@ class ConnectionListTests(unittest.TestCase):
         h = rc.sanitize_host({"address": "box.lan", "connections": [
             {"type": "ftp", "port": 2121}, {"type": "web", "url": "https://box.lan:8443"}, {"type": "bogus"}]})
         conns = rc.connection_list(h)
-        self.assertEqual([c["action"] for c in conns[:13]],
-                         ["ssh", "files", "rdp", "vnc", "rustdesk", "web", "ps", "ssh_ext", "mail", "smb", "ping", "wake", "verify"])
+        self.assertEqual([c["action"] for c in conns[:14]],
+                         ["ssh", "files", "stats", "rdp", "vnc", "rustdesk", "web", "ps", "ssh_ext", "mail", "smb", "ping", "wake", "verify"])
         extras = [c for c in conns if c.get("extra")]
         self.assertEqual(len(extras), 2)  # the bogus type was dropped by sanitize_host
         self.assertEqual(extras[0]["over"], {"file_mode": "FTP", "file_port": 2121})

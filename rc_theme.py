@@ -32,7 +32,7 @@ PALETTES = {
 }
 DEFAULT_THEME = "Sky Blue"
 # the Connect buttons: one bright colour per kind of connection, bold white text (all 4.5+ contrast with white)
-CONN = {"ssh": "#15803d", "files": "#c2410c", "rdp": "#1d4ed8", "web": "#0e7490", "ps": "#4338ca", "ssh_ext": "#475569",
+CONN = {"ssh": "#15803d", "files": "#c2410c", "stats": "#854d0e", "telnet": "#0f766e", "serial": "#7e22ce", "rdp": "#1d4ed8", "web": "#0e7490", "ps": "#4338ca", "ssh_ext": "#475569",
         "vnc": "#7c3aed", "rustdesk": "#0369a1", "mail": "#a21caf", "smb": "#0f766e", "ping": "#b45309", "verify": "#be123c"}
 
 
@@ -56,8 +56,8 @@ FIXES = {"Sky Blue": dict(btn="#1a63c9", btnact="#0d47a1", sel="#1565c0"),
 for _n, _fix in FIXES.items():
     PALETTES[_n][1].update(_fix)
 # colours a few labels / tree tags set by hand, and what reads well on a dark background instead
-FG_MAP = {"#555": "#a3a9b1", "#777": "#8b919a", "#b3261e": "#ff7b72", "#1a7f37": "#56d364", "#0b5cad": "#6cb6ff", "#d32f2f": "#ff6b6b"}
-TREE_TAGS = ("running", "error", "done", "extra")
+FG_MAP = {"#555": "#a3a9b1", "#777": "#8b919a", "#b3261e": "#ff7b72", "#1a7f37": "#56d364", "#0b5cad": "#6cb6ff", "#d32f2f": "#ff6b6b", "#b45309": "#f0b45a"}
+TREE_TAGS = ("running", "error", "done", "extra", "warn", "crit")
 
 
 class Theme:
