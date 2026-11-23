@@ -29,7 +29,7 @@ def auto_login(h):
     login = core.saved_login(h)
     if login:
         return login
-    return (h["user"] or None), ""
+    return (core.effective_host(h)["user"] or None), ""
 
 
 def run_remote(client, command, timeout=60):
@@ -720,8 +720,11 @@ class SnippetsTab(ttk.Frame):
         ttk.Label(right, text="Command").grid(row=1, column=0, sticky="nw")
         self.cmd = tk.Text(right, width=70, height=4, font=("Consolas", 10))
         self.cmd.grid(row=1, column=1, sticky="we", pady=2)
-        ttk.Checkbutton(right, text="Ask before running", variable=self.confirm).grid(row=2, column=1, sticky="w")
-        ttk.Button(right, text="💾 Save snippet", command=self.save).grid(row=3, column=1, sticky="w", pady=4)
+        self.group = tk.StringVar()
+        ttk.Label(right, text="Group (optional)").grid(row=2, column=0, sticky="w")
+        ttk.Entry(right, textvariable=self.group, width=40).grid(row=2, column=1, sticky="w", pady=2)
+        ttk.Checkbutton(right, text="Ask before running", variable=self.confirm).grid(row=3, column=1, sticky="w")
+        ttk.Button(right, text="💾 Save snippet", command=self.save).grid(row=4, column=1, sticky="w", pady=4)
 
         run = ttk.LabelFrame(self, text=" Run on these servers ", padding=8)
         run.pack(fill="both", expand=True, pady=(8, 0))
@@ -761,7 +764,7 @@ class SnippetsTab(ttk.Frame):
     def refill(self, select=None):
         self.listbox.delete(0, "end")
         for s in self.snips:
-            self.listbox.insert("end", s["name"])
+            self.listbox.insert("end", (f"{s['group']}  ›  " if s.get("group") else "") + s["name"])
         if select is not None and 0 <= select < len(self.snips):
             self.listbox.selection_set(select)
             self.load()
@@ -775,11 +778,13 @@ class SnippetsTab(ttk.Frame):
         self.cmd.delete("1.0", "end")
         self.cmd.insert("1.0", self.cur["command"])
         self.confirm.set(self.cur.get("confirm", True))
+        self.group.set(self.cur.get("group", ""))
 
     def new(self):
         self.cur = None
         self.listbox.selection_clear(0, "end")
         self.name.set("")
+        self.group.set("")
         self.cmd.delete("1.0", "end")
         self.confirm.set(True)
 
@@ -791,7 +796,7 @@ class SnippetsTab(ttk.Frame):
         if self.cur is None:
             self.cur = {"id": uuid.uuid4().hex[:8]}
             self.snips.append(self.cur)
-        self.cur.update(name=name, command=command, confirm=self.confirm.get())
+        self.cur.update(name=name, command=command, confirm=self.confirm.get(), group=self.group.get().strip())
         core.save_snippets(self.snips)
         self.refill(self.snips.index(self.cur))
 
@@ -1078,9 +1083,9 @@ class ImportTab(ttk.Frame):
         have = {h["address"].lower() for h in app.hosts}
         ttk.Label(self, text="Import servers", font=("Segoe UI", 16, "bold")).pack(anchor="w")
         ttk.Label(self, foreground="#555", wraplength=760, justify="left",
-                  text="Servers found in your PuTTY, WinSCP and ssh config. Passwords stored by those programs can't be "
-                       "read (they're encrypted for them), so you'll enter a password once or use a key. Servers already in "
-                       "RC (same address) are marked.").pack(anchor="w", pady=(2, 8))
+                  text="Servers found in the other program (PuTTY, WinSCP, ssh config, MobaXterm or Xshell). Passwords stored by "
+                       "those programs can't be read (they're encrypted for them), so you'll enter a password once or use a key. "
+                       "Servers already in RC (same address) are marked.").pack(anchor="w", pady=(2, 8))
         self.tree = ttk.Treeview(self, columns=("source", "address", "user", "port", "status"), selectmode="extended", height=14)
         for c, t, w in (("#0", "Name", 180), ("source", "From", 80), ("address", "Address", 190), ("user", "User", 90),
                         ("port", "Port", 50), ("status", "", 160)):
@@ -1094,7 +1099,7 @@ class ImportTab(ttk.Frame):
             if not dup:
                 self.tree.selection_add(str(i))
         if not self.items:
-            ttk.Label(self, text="Nothing found: no ~/.ssh/config entries and no saved PuTTY or WinSCP sessions.").pack(
+            ttk.Label(self, text="Nothing found to import here.").pack(
                 anchor="w", pady=8)
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=8)
@@ -1106,10 +1111,21 @@ class ImportTab(ttk.Frame):
         for iid in self.tree.selection():
             it = self.items[int(iid)]
             h = dict(core.NEW_HOST, id=uuid.uuid4().hex, name=it["name"], address=it["address"], user=it["user"],
-                     group=it.get("group", "") or it["source"], ssh_port=it["port"] if it.get("mode", "SFTP") == "SFTP" else 22,
+                     group=it.get("group", "") or it["source"].split(" · ")[0], ssh_port=it["port"] if it.get("mode", "SFTP") == "SFTP" else 22,
                      file_mode=it.get("mode", "SFTP"), file_port=0 if it.get("mode", "SFTP") == "SFTP" else it["port"],
                      key_file=it.get("key", "") if os.path.isfile(it.get("key", "") or "") else "",
                      notes=(f"Imported from {it['source']}. " + it.get("note", "")).strip(), web_url=f"http://{it['address']}")
+            kind = it.get("kind", "ssh")
+            if kind == "rdp":
+                h.update(rdp_port=it["port"], default_action="rdp", ssh_port=22)
+            elif kind == "vnc":
+                h.update(vnc_port=it["port"], default_action="vnc", ssh_port=22)
+            elif kind == "ftp":
+                h.update(file_mode="FTP", file_port=it["port"], default_action="files", ssh_port=22)
+            elif kind == "telnet":
+                h.update(ssh_port=22, default_action="telnet", connections=[{"type": "telnet", "label": "Telnet", "port": it["port"], "url": "", "user": ""}])
+            elif kind == "serial":
+                h.update(ssh_port=22, default_action="serial", connections=[{"type": "serial", "label": "Serial", "port": 0, "url": it.get("serial", ""), "user": ""}])
             if core.validate_host(h, self.app.hosts)[0]:
                 continue
             self.app.hosts.append(h)

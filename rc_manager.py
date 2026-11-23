@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.12.0"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
@@ -70,11 +70,14 @@ CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ACTIONS = [
     ("ssh", "SSH (in app)"),
     ("files", "Files - SFTP/FTP (in app)"),
+    ("stats", "📊 Live stats (CPU, memory, disks, processes)"),
     ("rdp", "Remote Desktop"),
     ("vnc", "VNC"),
     ("rustdesk", "RustDesk"),
     ("web", "Web"),
     ("ps", "PowerShell (remote)"),
+    ("telnet", "Telnet"),
+    ("serial", "Serial (COM port)"),
     ("ssh_ext", "SSH (separate window)"),
     ("mail", "Mail"),
     ("smb", "Network share (SMB)"),
@@ -83,15 +86,18 @@ ACTIONS = [
     ("verify", "✔ Check this server"),
 ]
 ACTION_LABEL = dict(ACTIONS)
-SHORT_LABEL = {"ssh": "SSH", "files": "Files", "rdp": "Remote Desktop", "vnc": "VNC", "rustdesk": "RustDesk", "web": "Web", "ps": "PowerShell",
+SECONDARY_ACTIONS = ("ssh_ext", "mail", "smb", "ping", "wake", "verify")   # shown on the second button line
+OPTIONAL_ACTIONS = ("telnet", "serial")      # buttons shown only for servers that have one
+SHORT_LABEL = {"ssh": "SSH", "files": "Files", "stats": "📊 Stats", "telnet": "Telnet", "serial": "Serial", "rdp": "Remote Desktop", "vnc": "VNC", "rustdesk": "RustDesk", "web": "Web", "ps": "PowerShell",
                "ssh_ext": "SSH window", "mail": "Mail", "smb": "Shares", "ping": "Ping", "wake": "⏻ Wake", "verify": "✔ Check"}
 # Extra connections a server can have besides its main ones (e.g. a second web page, FTP as well as SFTP)
 EXTRA_TYPES = [("ssh", "SSH"), ("sftp", "SFTP"), ("ftp", "FTP"), ("ftps", "FTPS"), ("rdp", "Remote Desktop"),
-               ("vnc", "VNC"), ("rustdesk", "RustDesk"), ("web", "Web"), ("mail", "Mail"), ("smb", "Network share"), ("ps", "PowerShell")]
+               ("vnc", "VNC"), ("rustdesk", "RustDesk"), ("web", "Web"), ("mail", "Mail"), ("smb", "Network share"), ("ps", "PowerShell"),
+               ("telnet", "Telnet"), ("serial", "Serial (COM port)")]
 EXTRA_LABEL = dict(EXTRA_TYPES)
 EXTRA_ACTION = {"ssh": "ssh", "sftp": "files", "ftp": "files", "ftps": "files", "rdp": "rdp", "vnc": "vnc", "rustdesk": "rustdesk", "web": "web",
-                "mail": "mail", "smb": "smb", "ps": "ps"}
-EXTRA_PORT = {"ssh": 22, "sftp": 22, "ftp": 21, "ftps": 21, "rdp": 3389, "vnc": 5900, "rustdesk": 0, "web": 0, "mail": 0, "smb": 445, "ps": 0}
+                "mail": "mail", "smb": "smb", "ps": "ps", "telnet": "telnet", "serial": "serial"}
+EXTRA_PORT = {"ssh": 22, "sftp": 22, "ftp": 21, "ftps": 21, "rdp": 3389, "vnc": 5900, "rustdesk": 0, "web": 0, "mail": 0, "smb": 445, "ps": 0, "telnet": 23, "serial": 0}
 FILE_MODES = ["SFTP", "FTP", "FTPS"]
 DEFAULT_FILE_PORT = {"SFTP": 22, "FTP": 21, "FTPS": 21}
 TUNNEL_KINDS = ("local", "remote", "dynamic")
@@ -239,7 +245,8 @@ NEW_HOST = {
     "file_mode": "SFTP", "file_port": 0, "key_file": "", "web_url": "", "mail_url": "",
     "default_action": "ssh", "notes": "", "password_enc": "", "connections": [],
     "tunnels": [], "bookmarks": [], "last_path": "",
-    "favorite": False, "last_connected": 0, "mac": "", "alt_addresses": [], "jump_host": "",
+    "favorite": False, "last_connected": 0, "mac": "", "alt_addresses": [], "jump_host": "", "identity": "", "proxy": "", "login_script": "",
+    "glances": False, "glances_port": 61208, "glances_https": False, "glances_user": "", "glances_password_enc": "",
 }
 
 
@@ -260,7 +267,8 @@ def sanitize_host(h, problems=None):
     merged.update(h)
     merged.setdefault("id", uuid.uuid4().hex)
     name = merged.get("name") or merged["address"]
-    for field, default in (("ssh_port", 22), ("rdp_port", 3389), ("vnc_port", 5900)):
+    merged["glances"], merged["glances_https"] = bool(merged.get("glances")), bool(merged.get("glances_https"))
+    for field, default in (("ssh_port", 22), ("rdp_port", 3389), ("vnc_port", 5900), ("glances_port", 61208)):
         fixed = _port(merged.get(field), default)
         if fixed != merged.get(field):
             problems.append(f"{name}: {field} {merged.get(field)!r} is not a valid port, using {default}")
@@ -278,7 +286,7 @@ def sanitize_host(h, problems=None):
     if merged.get("default_action") not in ACTION_LABEL:
         problems.append(f"{name}: default_action {merged.get('default_action')!r} unknown, using ssh")
         merged["default_action"] = "ssh"
-    for field in ("name", "group", "user", "key_file", "web_url", "mail_url", "notes", "password_enc", "last_path", "rustdesk_id", "rustdesk_password_enc"):
+    for field in ("name", "group", "user", "key_file", "web_url", "mail_url", "notes", "password_enc", "last_path", "rustdesk_id", "rustdesk_password_enc", "identity", "proxy", "login_script", "glances_user", "glances_password_enc"):
         if not isinstance(merged.get(field), str):
             merged[field] = "" if merged.get(field) is None else str(merged[field])
     merged["favorite"] = bool(merged.get("favorite"))
@@ -405,6 +413,261 @@ def save_snippets(snips):
     os.replace(tmp, SNIPPETS_FILE)
 
 
+WORKSPACES_FILE = os.path.join(APP_DIR, "workspaces.json")
+WORKSPACE_LAYOUTS = ("grid", "cols", "rows")
+
+
+def load_workspaces():
+    """Saved split-view layouts: [{'name', 'layout', 'hosts': [server ids]}]. A damaged file is moved aside, not overwritten."""
+    try:
+        with open(WORKSPACES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("not a list")
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError) as e:
+        log.warning("workspaces.json could not be read (%s)", e)
+        try:
+            os.replace(WORKSPACES_FILE, WORKSPACES_FILE + time.strftime(".corrupt-%Y%m%d-%H%M%S"))
+        except OSError:
+            pass
+        return []
+    out = []
+    for w in data:
+        if isinstance(w, dict) and str(w.get("name", "")).strip() and isinstance(w.get("hosts"), list):
+            out.append({"name": str(w["name"]).strip(), "layout": w.get("layout") if w.get("layout") in WORKSPACE_LAYOUTS else "grid",
+                        "hosts": [str(x) for x in w["hosts"] if x][:9]})
+    return out
+
+
+def save_workspaces(items):
+    tmp = WORKSPACES_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2)
+    os.replace(tmp, WORKSPACES_FILE)
+
+
+IDENTITIES_FILE = os.path.join(APP_DIR, "identities.json")
+PROXIES_FILE = os.path.join(APP_DIR, "proxies.json")
+IDENTITY_AUTH = (("password", "Password"), ("key", "Key file"), ("agent", "SSH agent / default keys"))
+PROXY_KINDS = (("socks5", "SOCKS5"), ("http", "HTTP (CONNECT)"))
+_LIST_CACHE = {}
+_LIST_LOCK = threading.Lock()
+
+
+def _load_list(path, clean, what):
+    """A list of dicts saved as JSON (identities, proxies). Cached until the file changes. A damaged file is moved
+    aside (never overwritten) and the list starts empty."""
+    try:
+        stamp = os.stat(path).st_mtime_ns
+    except OSError:
+        return []
+    with _LIST_LOCK:
+        hit = _LIST_CACHE.get(path)
+        if hit and hit[0] == stamp:
+            return [dict(x) for x in hit[1]]
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("not a list")
+    except (OSError, ValueError) as e:
+        log.warning("%s could not be read (%s)", os.path.basename(path), e)
+        try:
+            os.replace(path, path + time.strftime(".corrupt-%Y%m%d-%H%M%S"))
+        except OSError:
+            pass
+        return []
+    items, seen = [], set()
+    for d in data:
+        c = clean(d) if isinstance(d, dict) else None
+        if c and c["id"] not in seen:
+            seen.add(c["id"])
+            items.append(c)
+    with _LIST_LOCK:
+        _LIST_CACHE[path] = (stamp, items)
+    return [dict(x) for x in items]
+
+
+def _save_list(path, items):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2)
+    os.replace(tmp, path)
+    with _LIST_LOCK:
+        _LIST_CACHE.pop(path, None)
+
+
+def _s(d, key):
+    v = d.get(key)
+    if isinstance(v, str):
+        return v.strip()
+    return "" if v is None or isinstance(v, (dict, list)) else str(v).strip()
+
+
+def clean_identity(d):
+    name = _s(d, "name")
+    if not name:
+        return None
+    auth = d.get("auth") if d.get("auth") in dict(IDENTITY_AUTH) else "password"
+    return {"id": _s(d, "id") or uuid.uuid4().hex, "name": name, "user": _s(d, "user"), "auth": auth,
+            "secret_enc": _s(d, "secret_enc"), "key_file": _s(d, "key_file")}
+
+
+def clean_proxy(d):
+    name, host = _s(d, "name"), _s(d, "host")
+    if not name or not host:
+        return None
+    kind = d.get("kind") if d.get("kind") in dict(PROXY_KINDS) else "socks5"
+    return {"id": _s(d, "id") or uuid.uuid4().hex, "name": name, "kind": kind, "host": host,
+            "port": _port(d.get("port"), 1080 if kind == "socks5" else 8080), "user": _s(d, "user"),
+            "password_enc": _s(d, "password_enc")}
+
+
+def load_identities():
+    return _load_list(IDENTITIES_FILE, clean_identity, "identities")
+
+
+def save_identities(items):
+    _save_list(IDENTITIES_FILE, items)
+
+
+def load_proxies():
+    return _load_list(PROXIES_FILE, clean_proxy, "proxies")
+
+
+def save_proxies(items):
+    _save_list(PROXIES_FILE, items)
+
+
+def effective_host(h):
+    """The server as it is used to connect: if it has a saved login (identity), the identity's username, password
+    or key replace the server's own (the identity is the whole login, as in other terminal programs). The
+    stored server entry is never changed. Safe to call twice."""
+    iid = h.get("identity")
+    if not iid:
+        return h
+    ident = next((i for i in load_identities() if i["id"] == iid), None)
+    if ident is None:
+        return h
+    e = dict(h)
+    e["user"] = ident["user"]
+    e["_identity"] = ident["name"]
+    e["password_enc"] = ident["secret_enc"] if ident["auth"] in ("password", "key") else ""
+    e["key_file"] = ident["key_file"] if ident["auth"] == "key" else ""
+    if ident["auth"] == "password" and not ident["secret_enc"]:
+        e["_nosave"] = True      # nothing to remember on the server: the login belongs to the identity
+    return e
+
+
+def proxy_for(h):
+    """The proxy this server connects through (or None)."""
+    pid = h.get("proxy")
+    return next((p for p in load_proxies() if p["id"] == pid), None) if pid else None
+
+
+class ProxyError(Exception):
+    """The proxy refused or could not be reached; the message says what to tell the user."""
+
+
+_SOCKS_ERRORS = {1: "general SOCKS server failure", 2: "connection not allowed by the proxy's rules", 3: "network unreachable",
+                 4: "host unreachable", 5: "connection refused by the target", 6: "TTL expired", 7: "command not supported",
+                 8: "address type not supported"}
+
+
+def _recv_exact(sock, n):
+    buf = b""
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ProxyError("The proxy closed the connection unexpectedly.")
+        buf += chunk
+    return buf
+
+
+def proxy_connect(proxy, address, port, timeout=12):
+    """Open a TCP connection to address:port THROUGH the proxy and return the connected socket (SOCKS5 or HTTP CONNECT)."""
+    try:
+        sock = socket.create_connection((proxy["host"], int(proxy["port"])), timeout)
+    except OSError as e:
+        raise ProxyError(f"Cannot reach the proxy {proxy['host']}:{proxy['port']} ({e}).")
+    try:
+        sock.settimeout(timeout)
+        pw = unprotect_password(proxy["password_enc"]) if proxy.get("password_enc") else ""
+        if proxy["kind"] == "socks5":
+            _socks5(sock, proxy, pw, address, port)
+        else:
+            _http_connect(sock, proxy, pw, address, port)
+        sock.settimeout(None)
+        return sock
+    except ProxyError:
+        sock.close()
+        raise
+    except OSError as e:
+        sock.close()
+        raise ProxyError(f"The proxy {proxy['host']}:{proxy['port']} did not answer properly ({e}).")
+
+
+def _socks5(sock, proxy, pw, address, port):
+    user = proxy.get("user") or ""
+    sock.sendall(b"\x05\x02\x00\x02" if user else b"\x05\x01\x00")
+    ver, method = _recv_exact(sock, 2)
+    if ver != 5:
+        raise ProxyError(f"{proxy['host']}:{proxy['port']} is not a SOCKS5 proxy (is it an HTTP proxy?).")
+    if method == 0xFF:
+        raise ProxyError("The proxy accepts none of our login methods" + ("" if user else " (it needs a username and password)") + ".")
+    if method == 2:
+        if not user:
+            raise ProxyError("The proxy wants a username and password.")
+        u, p = user.encode("utf-8")[:255], pw.encode("utf-8")[:255]
+        sock.sendall(b"\x01" + bytes([len(u)]) + u + bytes([len(p)]) + p)
+        if _recv_exact(sock, 2)[1] != 0:
+            raise ProxyError("The proxy rejected the username or password.")
+    try:
+        packed = socket.inet_aton(address)
+        req = b"\x05\x01\x00\x01" + packed
+    except OSError:
+        name = address.encode("idna")
+        if len(name) > 255:
+            raise ProxyError("The server name is too long for SOCKS5.")
+        req = b"\x05\x01\x00\x03" + bytes([len(name)]) + name      # the proxy looks the name up itself
+    sock.sendall(req + int(port).to_bytes(2, "big"))
+    ver, rep, _rsv, atyp = _recv_exact(sock, 4)
+    if rep != 0:
+        raise ProxyError(f"The proxy could not connect to {address}:{port}: {_SOCKS_ERRORS.get(rep, 'error %d' % rep)}.")
+    if atyp == 3:
+        _recv_exact(sock, _recv_exact(sock, 1)[0] + 2)
+    else:
+        _recv_exact(sock, {1: 4, 4: 16}.get(atyp, 0) + 2)
+
+
+def _http_connect(sock, proxy, pw, address, port):
+    import base64 as b64
+    target = f"[{address}]:{port}" if ":" in address else f"{address}:{port}"
+    lines = [f"CONNECT {target} HTTP/1.1", f"Host: {target}"]
+    if proxy.get("user"):
+        lines.append("Proxy-Authorization: Basic " + b64.b64encode(f"{proxy['user']}:{pw}".encode("utf-8")).decode())
+    sock.sendall(("\r\n".join(lines) + "\r\n\r\n").encode("ascii", "replace"))
+    head = b""
+    while b"\r\n\r\n" not in head:
+        chunk = sock.recv(1)
+        if not chunk:
+            raise ProxyError("The proxy closed the connection without answering.")
+        head += chunk
+        if len(head) > 16384:
+            raise ProxyError("The proxy's answer was not understood.")
+    status = head.split(b"\r\n", 1)[0].decode("latin-1", "replace")
+    parts = status.split(None, 2)
+    if len(parts) < 2 or not parts[0].startswith("HTTP/") or not parts[1].isdigit():
+        raise ProxyError(f"{proxy['host']}:{proxy['port']} is not an HTTP proxy (it answered {status[:40]!r}).")
+    code = int(parts[1])
+    if code == 407:
+        raise ProxyError("The proxy wants a (correct) username and password.")
+    if code != 200:
+        raise ProxyError(f"The proxy refused to connect to {address}:{port}: {status}.")
+
+
 def web_url_for(h):
     url = (h.get("web_url") or "").strip()
     if not url:
@@ -475,6 +738,8 @@ def connection_list(h):
     out = [
         {"action": "ssh", "label": "SSH", "detail": f"port {h['ssh_port']}", "over": {}},
         {"action": "files", "label": f"Files ({h['file_mode']})", "detail": f"port {fport}", "over": {}},
+        {"action": "stats", "label": "Live stats",
+         "detail": f"from Glances, port {h['glances_port']}" if h.get("glances") else f"over SSH, port {h['ssh_port']}", "over": {}},
         {"action": "rdp", "label": "Remote Desktop", "detail": f"port {h['rdp_port']}", "over": {}},
         {"action": "vnc", "label": "VNC", "detail": f"port {h['vnc_port']}", "over": {}},
         {"action": "rustdesk", "label": "RustDesk",
@@ -508,6 +773,10 @@ def connection_list(h):
             over, detail = {"mail_url": url}, url
         elif t == "smb":
             over, detail = {"smb_path": url}, url or "\\\\" + h["address"]
+        elif t == "telnet":
+            over, detail = {"telnet_port": port or 23}, f"port {port or 23}"
+        elif t == "serial":
+            over, detail = {"serial_spec": url, "serial_baud": port}, (url or "(set the COM port)") + (f"  @ {port} baud" if port and url and str(port) not in url else "")
         if c.get("user"):
             over["user"] = c["user"]
         if c.get("password_enc"):
@@ -518,6 +787,7 @@ def connection_list(h):
 
 def saved_login(h):
     """(user, password) if a login is saved for this connection, else None."""
+    h = effective_host(h)
     if h.get("password_enc") and h.get("user"):
         pw = unprotect_password(h["password_enc"])
         if pw:
@@ -529,6 +799,8 @@ def variant(h, over):
     """A copy of server h with one connection's settings applied. '_src' points back at the real server."""
     v = dict(h, **over)
     v["_src"] = h.get("_src", h)
+    if "password_enc" in over or over.get("user"):
+        v["identity"] = ""     # this extra connection has its own login: the server's identity does not apply
     if "password_enc" in over:
         v["_nosave"] = True  # this connection has its own saved login
     elif over.get("user") and over["user"] != h["user"]:
@@ -645,6 +917,15 @@ def _ping_ms(addr, wait_ms=1000):
 def check_host_status(h, timeout=1.5):
     """Is this server up? Tries each of its addresses: the SSH port, then the Remote Desktop port (a refusal
     counts as up), then a ping. Returns {state 'up'|'down', addr, ms, port, via_alt, service}."""
+    px = proxy_for(h)
+    if px:       # only reachable through a proxy: test the SSH port that way (a direct probe would always say down)
+        port, t0 = _port(h.get("ssh_port"), 22), time.perf_counter()
+        try:
+            proxy_connect(px, h["address"], port, timeout=timeout + 2).close()
+            return {"state": "up", "addr": h["address"], "ms": round((time.perf_counter() - t0) * 1000), "port": port,
+                    "service": True, "via_alt": False}
+        except (ProxyError, OSError):
+            return {"state": "down", "addr": h["address"], "ms": 0, "port": 0, "service": False, "via_alt": False}
     ports = []
     for p in (_port(h.get("ssh_port"), 22), _port(h.get("rdp_port"), 3389)):
         if p not in ports:
@@ -692,12 +973,12 @@ class StatusMonitor:
                 self.round()
             except Exception:
                 log.exception("Status monitor round failed")
-            self.wake.wait(self.interval)
+            self.wake.wait(self.interval or None)      # 0 = no periodic check, only when asked (⟳)
             self.wake.clear()
 
     def round(self):
         from concurrent.futures import ThreadPoolExecutor, as_completed
-        hosts = [{k: h.get(k) for k in ("id", "address", "alt_addresses", "ssh_port", "rdp_port")}
+        hosts = [{k: h.get(k) for k in ("id", "address", "alt_addresses", "ssh_port", "rdp_port", "proxy")}
                  for h in list(self.get_hosts())]
         if not hosts:
             return
@@ -1015,6 +1296,7 @@ def _open_jump(app, jump, chain):
 def open_ssh_client(app, host, user, password, key_only=False, _chain=()):
     """Log in over SSH and return the paramiko client. Honours the server's jump host (reach it through another
     server) and its alternate addresses (first one that answers), and asks before trusting a new host key."""
+    host = effective_host(host)
     if paramiko is None:
         raise RuntimeError("The 'paramiko' package is missing. Run: pip install paramiko")
     try:
@@ -1063,6 +1345,10 @@ def open_ssh_client(app, host, user, password, key_only=False, _chain=()):
             except Exception as e:
                 raise RuntimeError(f"The jump server “{jump['name']}” could not reach {host['address']}:{port} ({e}).")
             via = f" via jump {jump['name']}"
+        elif proxy_for(host):
+            px = proxy_for(host)
+            sock = proxy_connect(px, host["address"], port)
+            via = f" via {dict(PROXY_KINDS)[px['kind']]} proxy {px['name']}"
         elif host.get("alt_addresses"):
             addr = resolve_address(host, port)
             if addr != host["address"]:  # connect the socket ourselves so the host key is still checked under the main address
@@ -1160,6 +1446,18 @@ class SftpBackend:
     # changes
     def mkdir(self, path):
         self.sftp.mkdir(path)
+
+    def touch(self, path):
+        """Create an empty file (fails if it exists)."""
+        self.sftp.open(path, "x").close()
+
+    def copy(self, src, dst, is_dir):
+        """Copy on the server itself (cp -a), so nothing travels through this PC. Needs a Unix-like server."""
+        import shlex
+        import rc_tools
+        code, out, err = rc_tools.run_remote(self.client, f"cp -a -- {shlex.quote(src)} {shlex.quote(dst)}", timeout=900)
+        if code != 0:
+            raise OSError((err or out).strip()[:200] or f"cp failed (exit {code}); the server may not have cp")
 
     def ensure_dir(self, path):
         """mkdir -p"""
@@ -1292,6 +1590,13 @@ class FtpBackend:
     def mkdir(self, path):
         self.ftp.mkd(path)
 
+    def touch(self, path):
+        import io
+        self.ftp.storbinary("STOR " + path, io.BytesIO(b""))
+
+    def copy(self, src, dst, is_dir):
+        raise OSError("Copying on the server needs SFTP (FTP has no server-side copy). Download it and upload it again instead.")
+
     def ensure_dir(self, path):
         cur = "/" if path.startswith("/") else ""
         for p in [p for p in path.split("/") if p]:
@@ -1406,107 +1711,168 @@ class HostEditor(ttk.Frame):
         row.pack(side="left")
         self.report = tk.StringVar()
         ttk.Label(self, textvariable=self.report, justify="left", wraplength=700).pack(anchor="w", pady=(0, 6))
-        f = ttk.Frame(self)
-        f.pack(anchor="w")
-        fields = [
-            ("name", "Name"), ("address", "IP address or DNS name"), ("group", "Group"),
-            ("user", "Username"), ("_password", "Password (or key passphrase)"), ("ssh_port", "SSH port"), ("rdp_port", "Remote Desktop port"),
-            ("vnc_port", "VNC port"), ("rustdesk_id", "RustDesk ID (blank = connect by IP address)"),
-            ("_rd_password", "RustDesk password (optional)"),
-            ("file_mode", "File transfer"), ("file_port", "File port (0 = default)"),
-            ("key_file", "SSH key file (optional)"), ("web_url", "Web address (blank = http://address)"),
-            ("mail_url", "Mail / webmail address"),
-            ("alt_addresses", "Other addresses (comma-separated, tried in order)"),
-            ("jump_host", "Connect through (jump server)"), ("mac", "MAC address (for Wake-on-LAN)"),
-            ("default_action", "Double-click does"),
+        # The form is split into tabs so it fits a small screen: each page is short, and Save / Verify stay at the top.
+        nb = self.pages = ttk.Notebook(self)
+        nb.pack(fill="both", expand=True)
+
+        def page(title):
+            fr = ttk.Frame(nb, padding=12)
+            nb.add(fr, text=f"  {title}  ")
+            return fr
+        p_general, p_login, p_conn, p_net, p_glances, p_extra, p_script = (
+            page(t) for t in ("General", "Login", "Connections", "Network", "Glances", "More connections", "After login"))
+        LABELS = {
+            "name": "Name", "address": "IP address or DNS name", "group": "Group", "default_action": "Double-click does",
+            "user": "Username", "_password": "Password (or key passphrase)", "identity": "Saved login (identity)",
+            "key_file": "SSH key file (optional)",
+            "ssh_port": "SSH port", "rdp_port": "Remote Desktop port", "vnc_port": "VNC port",
+            "rustdesk_id": "RustDesk ID (blank = connect by IP address)", "_rd_password": "RustDesk password (optional)",
+            "file_mode": "File transfer", "file_port": "File port (0 = default)",
+            "web_url": "Web address (blank = http://address)", "mail_url": "Mail / webmail address",
+            "alt_addresses": "Other addresses (comma-separated, tried in order)", "jump_host": "Connect through (jump server)",
+            "proxy": "Connect via proxy", "mac": "MAC address (for Wake-on-LAN)",
+        }
+        layout = [
+            (p_general, ["name", "address", "group", "default_action"]),
+            (p_login, ["user", "_password", "identity", "key_file"]),
+            (p_conn, ["ssh_port", "rdp_port", "vnc_port", "rustdesk_id", "_rd_password", "file_mode", "file_port", "web_url", "mail_url"]),
+            (p_net, ["alt_addresses", "jump_host", "proxy", "mac"]),
         ]
         self.jump_map = {"(none)": ""}
         for o in sorted(app.hosts, key=lambda x: x["name"].lower()):
             if o["id"] != host.get("id"):
                 self.jump_map[f"{o['name']}  ({o['address']})"] = o["id"]
-        for r, (key, label) in enumerate(fields):
-            ttk.Label(f, text=label).grid(row=r, column=0, sticky="w", pady=2, padx=(0, 10))
-            if key == "alt_addresses":
-                v = tk.StringVar(value=", ".join(host.get("alt_addresses") or []))
-            elif key == "jump_host":
-                v = tk.StringVar(value=next((l for l, i in self.jump_map.items() if i == host.get("jump_host")), "(none)"))
-            else:
-                v = tk.StringVar(value=str(host.get(key, "")))
-            if key == "_rd_password":
-                self.rd_pw_var = v
-                v.set("")
-                ttk.Entry(f, textvariable=v, width=36, show="•").grid(row=r, column=1, sticky="w", pady=2)
-                self.clear_rd_pw = tk.BooleanVar(value=False)
-                if host.get("rustdesk_password_enc"):
-                    ttk.Checkbutton(f, text="🔑 saved - tick to forget", variable=self.clear_rd_pw).grid(
+        self.identity_map = {"(none - use this server's own login)": ""}
+        for i in sorted(load_identities(), key=lambda x: x["name"].lower()):
+            self.identity_map[i["name"] + (f"  ({i['user']})" if i["user"] else "")] = i["id"]
+        self.proxy_map = {"(none - connect directly)": ""}
+        for px in sorted(load_proxies(), key=lambda x: x["name"].lower()):
+            self.proxy_map[f"{px['name']}  ({dict(PROXY_KINDS)[px['kind']]} {px['host']}:{px['port']})"] = px["id"]
+        self.maps = {"jump_host": self.jump_map, "identity": self.identity_map, "proxy": self.proxy_map}
+        for f, keys in layout:
+            for r, key in enumerate(keys):
+                ttk.Label(f, text=LABELS[key]).grid(row=r, column=0, sticky="w", pady=3, padx=(0, 10))
+                if key == "alt_addresses":
+                    v = tk.StringVar(value=", ".join(host.get("alt_addresses") or []))
+                elif key in self.maps:
+                    v = tk.StringVar(value=next((l for l, i in self.maps[key].items() if i == host.get(key)), next(iter(self.maps[key]))))
+                else:
+                    v = tk.StringVar(value=str(host.get(key, "")))
+                if key == "_rd_password":
+                    self.rd_pw_var = v
+                    v.set("")
+                    ttk.Entry(f, textvariable=v, width=36, show="•").grid(row=r, column=1, sticky="w", pady=3)
+                    self.clear_rd_pw = tk.BooleanVar(value=False)
+                    if host.get("rustdesk_password_enc"):
+                        ttk.Checkbutton(f, text="🔑 saved - tick to forget", variable=self.clear_rd_pw).grid(
+                            row=r, column=2, sticky="w", padx=4)
+                    continue
+                if key == "_password":
+                    self.pw_var = v
+                    self.pw_entry = ttk.Entry(f, textvariable=v, width=36, show="•")
+                    self.pw_entry.grid(row=r, column=1, sticky="w", pady=3)
+                    self.show_pw = tk.BooleanVar(value=False)
+                    ttk.Checkbutton(f, text="Show", variable=self.show_pw, command=self.toggle_pw).grid(
                         row=r, column=2, sticky="w", padx=4)
-                continue
-            if key == "_password":
-                self.pw_var = v
-                self.pw_entry = ttk.Entry(f, textvariable=v, width=36, show="•")
-                self.pw_entry.grid(row=r, column=1, sticky="w", pady=2)
-                self.show_pw = tk.BooleanVar(value=False)
-                ttk.Checkbutton(f, text="Show", variable=self.show_pw, command=self.toggle_pw).grid(
-                    row=r, column=2, sticky="w", padx=4)
-                continue
-            self.vars[key] = v
-            if key == "file_mode":
-                w = ttk.Combobox(f, textvariable=v, values=FILE_MODES, state="readonly", width=12)
-            elif key == "default_action":
-                w = ttk.Combobox(f, state="readonly", width=28, values=[l for _, l in ACTIONS])
-                w.set(ACTION_LABEL.get(host.get("default_action"), ACTIONS[0][1]))
-                self.action_box = w
-            elif key == "group":
-                w = ttk.Combobox(f, textvariable=v, values=groups, width=34)
-            elif key == "jump_host":
-                w = ttk.Combobox(f, textvariable=v, values=list(self.jump_map), state="readonly", width=34)
-            else:
-                w = ttk.Entry(f, textvariable=v, width=36)
-            w.grid(row=r, column=1, sticky="w", pady=2)
-            if key == "key_file":
-                ttk.Button(f, text="Browse…", command=self.browse_key).grid(row=r, column=2, padx=4)
-        r = len(fields)
-        ttk.Label(f, text="Notes").grid(row=r, column=0, sticky="nw", pady=2)
-        self.notes = tk.Text(f, width=36, height=2, wrap="word")
+                    continue
+                self.vars[key] = v
+                if key == "file_mode":
+                    w = ttk.Combobox(f, textvariable=v, values=FILE_MODES, state="readonly", width=12)
+                elif key == "default_action":
+                    w = ttk.Combobox(f, state="readonly", width=28, values=[l for _, l in ACTIONS])
+                    w.set(ACTION_LABEL.get(host.get("default_action"), ACTIONS[0][1]))
+                    self.action_box = w
+                elif key == "group":
+                    w = ttk.Combobox(f, textvariable=v, values=groups, width=34)
+                elif key in self.maps:
+                    w = ttk.Combobox(f, textvariable=v, values=list(self.maps[key]), state="readonly", width=34)
+                else:
+                    w = ttk.Entry(f, textvariable=v, width=36)
+                w.grid(row=r, column=1, sticky="w", pady=3)
+                if key == "key_file":
+                    ttk.Button(f, text="Browse…", command=self.browse_key).grid(row=r, column=2, padx=4)
+                elif key == "identity":
+                    ttk.Button(f, text="Manage…", command=self.app.open_identities).grid(row=r, column=2, padx=4)
+                elif key == "proxy":
+                    ttk.Button(f, text="Manage…", command=self.app.open_proxies).grid(row=r, column=2, padx=4)
+        # Glances: use its web API for the Stats tab
+        self.gl_on = tk.BooleanVar(value=bool(host.get("glances")))
+        self.gl_port, self.gl_user, self.gl_pw = tk.StringVar(value=str(host.get("glances_port") or 61208)), tk.StringVar(value=host.get("glances_user", "")), tk.StringVar()
+        self.gl_https, self.gl_forget = tk.BooleanVar(value=bool(host.get("glances_https"))), tk.BooleanVar(value=False)
+        self.gl_result = tk.StringVar()
+        ttk.Checkbutton(p_glances, text="Use Glances for this server's Stats (it runs  glances -w )", variable=self.gl_on).grid(
+            row=0, column=0, columnspan=3, sticky="w")
+        ttk.Label(p_glances, foreground="#555", wraplength=600, justify="left", text=(
+            "Glances (nicolargo.github.io/glances) is a monitor many people run on their machines. With this ticked, Stats reads its web "
+            "API instead of logging in over SSH, so it works for PCs and servers you have no SSH login for, and it also shows containers "
+            "and temperatures. Leave it unticked for machines without Glances; Stats then uses SSH as before.")).grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(2, 8))
+        for r, (label, var, w, show) in enumerate((("Glances port", self.gl_port, 10, ""), ("Username (if set)", self.gl_user, 24, ""),
+                                                   ("Password (if set)", self.gl_pw, 24, "•")), start=2):
+            ttk.Label(p_glances, text=label).grid(row=r, column=0, sticky="w", pady=3, padx=(0, 10))
+            ttk.Entry(p_glances, textvariable=var, width=w, show=show).grid(row=r, column=1, sticky="w", pady=3)
+        if host.get("glances_password_enc"):
+            ttk.Checkbutton(p_glances, text="🔑 saved - tick to forget", variable=self.gl_forget).grid(row=4, column=2, sticky="w", padx=4)
+        ttk.Checkbutton(p_glances, text="Use https (Glances started with --enable-https)", variable=self.gl_https).grid(row=5, column=1, sticky="w")
+        gbar = ttk.Frame(p_glances)
+        gbar.grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        ttk.Button(gbar, text="🔎 Detect / test Glances", command=self.detect_glances).pack(side="left")
+        ttk.Label(p_glances, textvariable=self.gl_result, wraplength=600, justify="left").grid(row=7, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        # General: notes
+        ttk.Label(p_general, text="Notes").grid(row=4, column=0, sticky="nw", pady=3)
+        self.notes = tk.Text(p_general, width=36, height=3, wrap="word")
         self.notes.insert("1.0", host.get("notes", ""))
-        self.notes.grid(row=r, column=1, sticky="w", pady=2)
+        self.notes.grid(row=4, column=1, sticky="w", pady=3)
+        # Login: what saving a password does
         self.clear_pw = tk.BooleanVar(value=False)
         if host.get("password_enc"):
-            ttk.Checkbutton(f, text="🔑 A password is saved (encrypted, this Windows account only). Tick to forget it; "
-                                    "type a new one above to replace it.", variable=self.clear_pw).grid(
-                row=r + 1, column=0, columnspan=3, sticky="w", pady=2)
+            ttk.Checkbutton(p_login, text="🔑 A password is saved (encrypted, this Windows account only). Tick to forget it;\n"
+                                          "type a new one above to replace it.", variable=self.clear_pw).grid(
+                row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
         else:
-            ttk.Label(f, text="🔑 Anything typed in Password is saved encrypted on this PC (Windows account only) and "
-                              "filled in for you when you connect.", foreground="#555").grid(
-                row=r + 1, column=0, columnspan=3, sticky="w", pady=2)
+            ttk.Label(p_login, text="🔑 Anything typed in Password is saved encrypted on this PC (Windows account only)\n"
+                                    "and filled in for you when you connect. An identity replaces this username and password.",
+                      foreground="#555").grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
+        # After login
+        self.script = tk.Text(p_script, width=80, height=7, wrap="none", font=("Consolas", 9))
+        self.script.insert("1.0", host.get("login_script", ""))
+        self.script.pack(fill="both", expand=True)
+        ttk.Label(p_script, foreground="#555", justify="left", wraplength=640, text=(
+            "One step per line:  wait-for-text => what to type.  Example:   $ => sudo -i   then   assword => ${password}\n"
+            "The wait text is a pattern (case does not matter); leave it empty to type straight away. Enter is added. "
+            "${user}, ${host} and ${password} are filled in. A step that does not appear within 10 s stops the script. "
+            "Lines starting with // are notes.")).pack(anchor="w", pady=(6, 0))
+        # More connections
         self.extras = [dict(c) for c in host.get("connections", [])]
-        box = ttk.LabelFrame(f, text=" More connections for this server (optional) ", padding=8)
-        box.grid(row=r + 2, column=0, columnspan=3, sticky="we", pady=(10, 0))
-        self.extra_tree = ttk.Treeview(box, columns=("type", "port", "to", "login"), height=2, selectmode="browse")
+        box = p_extra
+        ttk.Label(box, foreground="#555", wraplength=640, justify="left", text=(
+            "A second web page, FTP as well as SFTP, SSH on another port, a Telnet console, a COM port ... Each one gets its own "
+            "button entry (a ▾ appears when a server has several).")).grid(row=0, column=0, columnspan=7, sticky="w", pady=(0, 6))
+        self.extra_tree = ttk.Treeview(box, columns=("type", "port", "to", "login"), height=5, selectmode="browse")
         self.extra_tree.heading("#0", text="Name")
         self.extra_tree.heading("type", text="Type")
         self.extra_tree.heading("port", text="Port")
-        self.extra_tree.heading("to", text="Web / mail / share address")
+        self.extra_tree.heading("to", text="Address / share / COM port")
         self.extra_tree.heading("login", text="Login")
         for col, w in (("#0", 130), ("type", 95), ("port", 50), ("to", 230), ("login", 110)):
             self.extra_tree.column(col, width=w)
-        self.extra_tree.grid(row=0, column=0, columnspan=7, sticky="we")
+        self.extra_tree.grid(row=1, column=0, columnspan=7, sticky="we")
         self.x_type = tk.StringVar(value="Web")
         self.x_label, self.x_port, self.x_url, self.x_user, self.x_pw = (tk.StringVar() for _ in range(5))
         for c, (text, var, w) in enumerate((("Type", None, 12), ("Name", self.x_label, 13), ("Port", self.x_port, 6),
-                                            ("Address (web/mail/share)", self.x_url, 24), ("User", self.x_user, 10),
+                                            ("Address / COM port (COM3, 115200, 8N1)", self.x_url, 24), ("User", self.x_user, 10),
                                             ("Password", self.x_pw, 10))):
-            ttk.Label(box, text=text).grid(row=1, column=c, sticky="w", pady=(6, 0))
+            ttk.Label(box, text=text).grid(row=2, column=c, sticky="w", pady=(8, 0))
             if var is None:
                 ttk.Combobox(box, textvariable=self.x_type, values=[l for _, l in EXTRA_TYPES], state="readonly",
-                             width=w).grid(row=2, column=c, sticky="w", padx=(0, 4))
+                             width=w).grid(row=3, column=c, sticky="w", padx=(0, 4))
             else:
                 e = ttk.Entry(box, textvariable=var, width=w, show="•" if var is self.x_pw else "")
-                e.grid(row=2, column=c, sticky="w", padx=(0, 4))
+                e.grid(row=3, column=c, sticky="w", padx=(0, 4))
                 if var is self.x_pw:
                     self.x_pw_entry = e
         bb = ttk.Frame(box)
-        bb.grid(row=3, column=0, columnspan=7, sticky="w", pady=(6, 0))
+        bb.grid(row=4, column=0, columnspan=7, sticky="w", pady=(8, 0))
         ttk.Button(bb, text="➕ Add this connection", command=self.add_extra).pack(side="left")
         ttk.Button(bb, text="Remove selected", command=self.remove_extra).pack(side="left", padx=6)
         self.refresh_extras()
@@ -1538,6 +1904,13 @@ class HostEditor(ttk.Frame):
         if t in ("web", "mail") and not url:
             messagebox.showerror("Connection", "Enter the web or mail address for this connection.", parent=self)
             return
+        if t == "serial":
+            import rc_transport
+            try:
+                rc_transport.parse_serial_spec(url, port)
+            except ValueError as e:
+                messagebox.showerror("Connection", str(e) + "\n\nExample:  COM3, 115200, 8N1, rtscts  (speed in the Port box also works)", parent=self)
+                return
         if t == "web":
             parsed = urlparse(url if "://" in url else "http://" + url)
             if parsed.scheme not in ("http", "https") or not parsed.hostname:
@@ -1573,6 +1946,39 @@ class HostEditor(ttk.Frame):
         if p:
             self.vars["key_file"].set(p)
 
+    def glances_settings(self):
+        """(settings dict for rc_glances, error or '') from the Glances tab."""
+        try:
+            port = int(self.gl_port.get().strip() or 61208)
+            if not 1 <= port <= 65535:
+                raise ValueError
+        except ValueError:
+            return {}, "The Glances port must be a number from 1 to 65535."
+        pw = self.gl_pw.get()
+        enc = protect_password(pw) if pw else ("" if self.gl_forget.get() else self.host.get("glances_password_enc", ""))
+        return {"glances": bool(self.gl_on.get()), "glances_port": port, "glances_https": bool(self.gl_https.get()),
+                "glances_user": self.gl_user.get().strip(), "glances_password_enc": enc}, ""
+
+    def detect_glances(self):
+        """Is Glances answering on this address? If so, tick the box."""
+        settings, err = self.glances_settings()
+        addr = re.sub(r"^\w+://", "", self.vars["address"].get().strip()).strip("/ ")
+        if err or not addr:
+            self.gl_result.set("✖ " + (err or "Enter the server's address on the General tab first."))
+            return
+        self.gl_result.set("Looking for Glances ...")
+        probe = dict(self.host, address=addr, **settings)
+
+        def work():
+            import rc_glances
+            try:
+                version, desc = rc_glances.detect(probe)
+                msg, found = f"✔ Found: {desc}. Ticked \"Use Glances\" for you.", True
+            except rc_glances.GlancesError as e:
+                msg, found = f"✖ {e}", False
+            self.app.post(lambda: (self.gl_result.set(msg), found and self.gl_on.set(True)))
+        threading.Thread(target=work, daemon=True, name="glances-detect").start()
+
     def collect(self):
         """Read the form. Returns (host, errors, warnings)."""
         h = dict(self.host)
@@ -1581,6 +1987,8 @@ class HostEditor(ttk.Frame):
         h["address"] = re.sub(r"^\w+://", "", h["address"]).strip("/ ")
         h["alt_addresses"] = [a for a in re.split(r"[,;\s]+", h.get("alt_addresses", "")) if a]
         h["jump_host"] = self.jump_map.get(self.vars["jump_host"].get().strip(), "")
+        h["identity"] = self.identity_map.get(self.vars["identity"].get().strip(), "")
+        h["proxy"] = self.proxy_map.get(self.vars["proxy"].get().strip(), "")
         h["mac"] = normalize_mac(h.get("mac", "")) or h.get("mac", "")
         errors = []
         if not h["address"]:
@@ -1599,6 +2007,18 @@ class HostEditor(ttk.Frame):
         h["default_action"] = next((k for k, l in ACTIONS if l == label), "ssh")
         h["name"] = h["name"] or h["address"]
         h["notes"] = self.notes.get("1.0", "end").strip()
+        gl, gl_err = self.glances_settings()
+        if gl_err:
+            errors.append(gl_err)
+        else:
+            h.update(gl)
+        h["login_script"] = self.script.get("1.0", "end").strip()
+        if h["login_script"]:
+            import rc_quick
+            try:
+                rc_quick.parse_login_script(h["login_script"])
+            except ValueError as e:
+                errors.append("After login: " + str(e))
         h["connections"] = [dict(c) for c in self.extras]
         h["rustdesk_id"] = re.sub(r"\s+", "", h.get("rustdesk_id", ""))
         if self.rd_pw_var.get():
@@ -1752,16 +2172,31 @@ class App:
         self.theme = rc_theme.Theme(root, SETTINGS_FILE)
         self.dark_var = tk.BooleanVar(value=self.theme.dark)
         self.theme_var = tk.StringVar(value=self.theme.name)
+        import rc_prefs
+        self.prefs = rc_prefs.load()
+        self.base_scaling = float(root.tk.call("tk", "scaling"))
         self.build()
         self.refill()
         self.pump()
+        self.apply_prefs()
         self.monitor.start()
         self.root.after(30000, self.tick)
         self.theme.apply()
         self.sync_theme_button()
         root.bind("<Control-w>", lambda _: self.close_tab())
         root.bind("<Control-k>", lambda _: self.quick_connect())
+        for d in "123456789":
+            root.bind(f"<Control-Key-{d}>", lambda e, d=d: self.handle_shortcut(d, True, False) and "break")
+        root.bind("<Control-Tab>", lambda e: self.handle_shortcut("Tab", True, False) and "break")
+        root.bind("<Control-ISO_Left_Tab>", lambda e: self.handle_shortcut("ISO_Left_Tab", True, True) and "break")
+        root.bind("<Control-Shift-D>", lambda e: self.handle_shortcut("D", True, True) and "break")
         root.protocol("WM_DELETE_WINDOW", self.on_exit)
+        self.drag_tab = None
+        self.nb.bind("<ButtonPress-1>", self.tab_press, add="+")
+        self.nb.bind("<B1-Motion>", self.tab_drag, add="+")
+        self.nb.bind("<ButtonRelease-1>", lambda e: setattr(self, "drag_tab", None), add="+")
+        if self.prefs["reopen_tabs"]:
+            self.root.after(900, self.restore_session)
 
     def tick(self):
         """Every 30 s: keep the 'checked 2 min ago' texts honest."""
@@ -1783,9 +2218,104 @@ class App:
         self.dark_var.set(self.theme.dark)
         self.theme_btn.configure(text="🎨 " + self.theme.name)
 
+    def live_sessions(self):
+        """What would be lost by closing now: (open terminals / stats / file tabs, transfers still running)."""
+        tabs = [self.nb.nametowidget(t) for t in self.nb.tabs()]
+        tabs = [t for t in tabs if t is not self.home]
+        sessions = [t for t in tabs if hasattr(t, "terminals") or hasattr(t, "jobs") or t.__class__.__name__ == "MonitorTab"]
+        busy = sum(1 for t in tabs if self.busy_tab(t))
+        return len(sessions), busy
+
+    def session_state(self):
+        """The tabs to reopen next time: [{'action', 'host', 'over', 'active'}]."""
+        out, current = [], self.nb.select()
+        for name in self.nb.tabs():
+            w = self.nb.nametowidget(name)
+            if w is self.home:
+                continue
+            kind = w.__class__.__name__
+            if kind == "TerminalTab" and w.kind in ("ssh", "telnet", "serial"):
+                host, over = w.host.get("_src", w.host), {}
+                if w.kind == "telnet":
+                    over = {"telnet_port": w.host.get("telnet_port", 23)}
+                elif w.kind == "serial":
+                    over = {"serial_spec": w.host.get("serial_spec", ""), "serial_baud": w.host.get("serial_baud", 0)}
+                item = {"action": w.kind, "host": host.get("id"), "over": over}
+            elif kind == "FilesTab":
+                item = {"action": "files", "host": w.src.get("id"), "over": {}}
+            elif kind == "MonitorTab":
+                item = {"action": "stats", "host": w.host.get("_src", w.host).get("id"), "over": {}}
+            else:
+                continue
+            item["active"] = (name == str(current))
+            out.append(item)
+        return out
+
+    def restore_session(self):
+        """Reopen the tabs that were open when RC was closed (Preferences > Reopen my tabs)."""
+        import rc_prefs
+        items = rc_prefs.load_session()
+        by_id = {h["id"]: h for h in self.hosts}
+        opened, active = 0, None
+        for it in items:
+            h = by_id.get(it["host"])
+            if h is None:
+                continue
+            self.select_host(h["id"])
+            try:
+                self.do(it["action"], it["over"] or None)
+            except Exception:
+                log.exception("Could not reopen %s for %s", it["action"], h.get("name"))
+                continue
+            opened += 1
+            if it.get("active"):
+                active = self.nb.select()
+        if active:
+            self.nb.select(active)
+        if opened:
+            self.status.set(f"Reopened {opened} tab(s) from last time")
+        return opened
+
+    def apply_prefs(self):
+        """Put the Preferences into effect (called at start and whenever one changes)."""
+        p = self.prefs
+        self.monitor.interval = p["check_interval"]
+        self.monitor.refresh() if getattr(self, "_prefs_applied", False) else None
+        self._prefs_applied = True
+        try:
+            import rc_monitor
+            rc_monitor.MonitorTab.DEFAULT_INTERVAL = p["stats_interval"]
+        except Exception:
+            log.debug("could not set the Stats interval", exc_info=True)
+        try:
+            self.root.tk.call("tk", "scaling", self.base_scaling * p["ui_scale"] / 100.0)
+        except tk.TclError:
+            pass
+
+    def open_prefs(self):
+        import rc_prefs
+        self.open_singleton("prefs_tab", lambda: rc_prefs.PrefsTab(self), "⚙ Preferences")
+
     def on_exit(self):
+        sessions, busy = self.live_sessions()
+        if self.prefs.get("confirm_exit", True) and sessions:
+            msg = f"{sessions} session tab(s) are open" + (f" and {busy} of them are still transferring files" if busy else "") + ". Close RC anyway?"
+            if not messagebox.askyesno(APP_NAME, msg, icon="warning", parent=self.root):
+                return
+        try:
+            import rc_prefs
+            rc_prefs.save_session(self.session_state() if self.prefs.get("reopen_tabs") else [])
+        except OSError:
+            log.warning("Could not save the list of open tabs", exc_info=True)
         self.monitor.stop()
         self.tunnel_mgr.stop_all()
+        for attr in ("localsrv_tab", "netscan_tab"):      # a TFTP/HTTP server or a scan must not outlive the window
+            tab = getattr(self, attr, None)
+            if tab is not None:
+                try:
+                    tab.close()
+                except Exception:
+                    log.debug("closing %s failed", attr, exc_info=True)
         self.root.destroy()
 
     # tools
@@ -1803,6 +2333,51 @@ class App:
             return
         self.tunnels_tab = rc_tools.TunnelsTab(self)
         self.add_tab(self.tunnels_tab, "⇄ Tunnels")
+
+    def play_recording(self):
+        import rc_record
+        rc_record.play_file(self)
+
+    def open_notes(self, host_id=None):
+        import rc_notes
+        tab = self.open_singleton("notes_tab", lambda: rc_notes.NotesTab(self), "📝 Notes")
+        if host_id:
+            tab.focus_server(host_id)
+        return tab
+
+    def backup_everything(self):
+        import rc_backup
+        rc_backup.backup_dialog(self)
+
+    def restore_backup(self):
+        import rc_backup
+        rc_backup.restore_dialog(self)
+
+    def open_netscan(self):
+        import rc_netscan
+        self.open_singleton("netscan_tab", lambda: rc_netscan.NetScanTab(self), "🔎 Network scan")
+
+    def open_localsrv(self):
+        import rc_localsrv
+        self.open_singleton("localsrv_tab", lambda: rc_localsrv.LocalServicesTab(self), "Local servers")
+
+    def open_identities(self):
+        import rc_identity
+        self.open_singleton("identities_tab", lambda: rc_identity.IdentitiesTab(self), "👤 Identities")
+
+    def open_proxies(self):
+        import rc_identity
+        self.open_singleton("proxies_tab", lambda: rc_identity.ProxiesTab(self), "🌐 Proxies")
+
+    def open_singleton(self, attr, make, title):
+        tab = getattr(self, attr, None)
+        if tab is not None and str(tab) in self.nb.tabs():
+            self.nb.select(tab)
+            return tab
+        tab = make()
+        setattr(self, attr, tab)
+        self.add_tab(tab, title)
+        return tab
 
     def open_snippets(self, preselect=None):
         import rc_tools
@@ -1831,6 +2406,25 @@ class App:
     def open_keys(self):
         import rc_tools
         self.add_tab(rc_tools.KeysTab(self), "🔑 Keys")
+
+    def import_mobaxterm(self):
+        import rc_import, rc_tools
+        path = filedialog.askopenfilename(title="MobaXterm sessions export", filetypes=[("MobaXterm sessions", "*.mxtsessions *.ini *.txt"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            items = rc_import.parse_mobaxterm(rc_import.read_text(path))
+        except OSError as e:
+            messagebox.showerror(APP_NAME, f"Could not read that file:\n{e}", parent=self.root)
+            return
+        self.add_tab(rc_tools.ImportTab(self, items), "⇩ Import (MobaXterm)")
+
+    def import_xshell(self):
+        import rc_import, rc_tools
+        folder = filedialog.askdirectory(title="Xshell Sessions folder", initialdir=rc_import.default_xshell_folder() or os.path.expanduser("~"))
+        if not folder:
+            return
+        self.add_tab(rc_tools.ImportTab(self, rc_import.scan_xshell_folder(folder)), "⇩ Import (Xshell)")
 
     def import_sessions(self):
         import rc_tools
@@ -1882,9 +2476,12 @@ class App:
         row2 = ttk.Frame(top)
         row2.pack(fill="x", pady=(6, 4))
         ttk.Label(row2, text="Connect:").pack(side="left")
+        row3 = ttk.Frame(top)       # the less-used buttons get their own line so none is cut off on a narrow window
+        row3.pack(fill="x", pady=(0, 4))
+        ttk.Label(row3, text="More:").pack(side="left")
         self.buttons = {}
         for key, label in ACTIONS:
-            b = ttk.Button(row2, text=SHORT_LABEL[key], style=f"{key}.Conn.TButton")
+            b = ttk.Button(row3 if key in SECONDARY_ACTIONS else row2, text=SHORT_LABEL[key], style=f"{key}.Conn.TButton")
             b.configure(command=lambda k=key, b=b: self.press(k, b))
             b.pack(side="left", padx=(6, 0))
             self.buttons[key] = b
@@ -1921,7 +2518,6 @@ class App:
         self.nb.bind("<Button-2>", self.middle_close)
         self.nb.bind("<Button-3>", self.tab_menu)
         self.tab_popup = tk.Menu(self.root, tearoff=0)
-        self.tab_popup.add_command(label="Disconnect / close tab", command=self.close_tab)
 
         self.home = ttk.Frame(self.nb, padding=20)
         self.nb.add(self.home, text="  Servers  ")
@@ -1969,51 +2565,385 @@ class App:
     def build_menus(self):
         bar = tk.Menu(self.root)
         self.root.configure(menu=bar)
+        # File: everything about the server list, plus leaving
         file_m = tk.Menu(bar, tearoff=0)
         file_m.add_command(label="Add server…", accelerator="Ctrl+N", command=self.add_host)
-        file_m.add_command(label="Import servers from a CSV file…", command=self.import_csv)
+        file_m.add_command(label="Edit selected server…", command=self.edit_host)
+        file_m.add_command(label="Duplicate selected server", command=self.duplicate_host)
+        file_m.add_command(label="Delete selected server", command=self.delete_host)
+        file_m.add_command(label="★ Add / remove favorite", command=self.toggle_favorite)
+        file_m.add_command(label="Copy address", command=self.copy_address)
         file_m.add_separator()
-        file_m.add_command(label="📤 Export everything to a file…", command=self.export_everything)
-        file_m.add_command(label="📥 Import everything from a file…", command=self.import_everything)
+        imp = tk.Menu(file_m, tearoff=0)
+        imp.add_command(label="From a CSV / text file…", command=self.import_csv)
+        imp.add_command(label="From PuTTY / WinSCP / ssh config…", command=self.import_sessions)
+        imp.add_command(label="From MobaXterm (.mxtsessions export)…", command=self.import_mobaxterm)
+        imp.add_command(label="From Xshell (Sessions folder)…", command=self.import_xshell)
+        file_m.add_cascade(label="Import servers", menu=imp)
+        file_m.add_command(label="Export servers to a CSV file…", command=self.export_csv)
+        bak = tk.Menu(file_m, tearoff=0)
+        bak.add_command(label="Back up everything (encrypted)…", command=self.backup_everything)
+        bak.add_command(label="Restore from a backup…", command=self.restore_backup)
+        file_m.add_cascade(label="Backup", menu=bak)
         file_m.add_separator()
         file_m.add_command(label="Disconnect current tab", accelerator="Ctrl+W", command=self.close_tab)
         file_m.add_command(label="Disconnect all", command=self.disconnect_all)
+        file_m.add_separator()
         file_m.add_command(label="Exit", command=self.on_exit)
         bar.add_cascade(label="File", menu=file_m)
-        edit_m = tk.Menu(bar, tearoff=0)
-        edit_m.add_command(label="Edit selected server…", command=self.edit_host)
-        edit_m.add_command(label="Delete selected server", command=self.delete_host)
-        edit_m.add_command(label="Copy address", command=self.copy_address)
-        edit_m.add_separator()
-        edit_m.add_command(label="Forget ALL saved passwords…", command=self.forget_all_passwords)
-        bar.add_cascade(label="Server", menu=edit_m)
+        # Connect / Servers: unchanged behaviour
         conn = tk.Menu(bar, tearoff=0)
         for key, label in ACTIONS:
             conn.add_command(label=label, command=lambda k=key: self.press(k))
         bar.add_cascade(label="Connect", menu=conn)
         self.servers_menu = tk.Menu(bar, tearoff=0)
         bar.add_cascade(label="Servers", menu=self.servers_menu)
-        tools = tk.Menu(bar, tearoff=0)
-        tools.add_command(label="Quick connect…", accelerator="Ctrl+K", command=self.quick_connect)
-        tools.add_command(label="🔑 Set up keys for all servers…", command=self.open_keys)
-        tools.add_command(label="SSH tunnels…", command=self.open_tunnels)
-        tools.add_command(label="Snippets (saved commands)…", command=self.open_snippets)
-        tools.add_command(label="🛡 Trusted host keys…", command=self.open_known_hosts)
-        tools.add_command(label="⟳ Check all servers now", command=self.refresh_status)
-        tools.add_command(label="📄 Open the log file", command=self.open_log)
-        tools.add_separator()
-        themes = tk.Menu(tools, tearoff=0)
+        # Session: tabs, split view and broadcast
+        sess = tk.Menu(bar, tearoff=0)
+        sess.add_command(label="New split view (several terminals in one tab)", command=self.new_split_view)
+        sess.add_command(label="Open selected server in a split view", command=self.server_to_split)
+        sess.add_separator()
+        sess.add_command(label="💾 Save this split view as a workspace…", command=self.save_workspace)
+        self.ws_menu = tk.Menu(sess, tearoff=0, postcommand=self.fill_workspace_menu)
+        sess.add_cascade(label="Open workspace", menu=self.ws_menu)
+        sess.add_command(label="Manage workspaces…", command=self.manage_workspaces)
+        sess.add_separator()
+        sess.add_command(label="Duplicate this session", command=self.duplicate_session)
+        sess.add_command(label="Rename this tab…", command=self.rename_tab)
+        sess.add_command(label="🔒 Lock / unlock this tab", command=self.toggle_lock)
+        sess.add_command(label="Close other tabs", command=lambda: self.close_tabs("others"))
+        sess.add_separator()
+        sess.add_command(label="📡 Broadcast: type in ALL open terminals", command=lambda: self.broadcast_all(True))
+        sess.add_command(label="Stop broadcasting", command=lambda: self.broadcast_all(False))
+        bar.add_cascade(label="Session", menu=sess)
+        # View
+        view = tk.Menu(bar, tearoff=0)
+        view.add_command(label="🏠 Overview", command=self.show_overview)
+        view.add_command(label="⟳ Check all servers now", command=self.refresh_status)
+        view.add_separator()
+        themes = tk.Menu(view, tearoff=0)
         import rc_theme
         for name in rc_theme.PALETTES:
             themes.add_radiobutton(label=name, variable=self.theme_var, value=name, command=self.toggle_dark)
-        tools.add_cascade(label="🎨 Color theme", menu=themes)
-        tools.add_command(label="Import from PuTTY / WinSCP / ssh config…", command=self.import_sessions)
+        view.add_cascade(label="🎨 Color theme", menu=themes)
+        size = tk.Menu(view, tearoff=0)
+        size.add_command(label="Bigger terminal text", command=lambda: self.terminal_font(+1))
+        size.add_command(label="Smaller terminal text", command=lambda: self.terminal_font(-1))
+        size.add_command(label="Reset terminal text size", command=lambda: self.terminal_font(0))
+        view.add_cascade(label="Terminal text size", menu=size)
+        import rc_terminal
+        tsc = tk.Menu(view, tearoff=0)
+        self.tscheme_var = tk.StringVar(value=rc_terminal.load_prefs()["scheme"])
+        for name in rc_terminal.SCHEMES:
+            tsc.add_radiobutton(label=name, variable=self.tscheme_var, value=name, command=lambda n=name: self.set_terminal_scheme(n))
+        view.add_cascade(label="Terminal colours", menu=tsc)
+        view.add_command(label="Terminal font…", command=self.terminal_font_dialog)
+        bar.add_cascade(label="View", menu=view)
+        # Tools, grouped
+        tools = tk.Menu(bar, tearoff=0)
+        tools.add_command(label="Quick connect…", accelerator="Ctrl+K", command=self.quick_connect)
+        tools.add_command(label="Snippets (saved commands)…", command=self.open_snippets)
+        net = tk.Menu(tools, tearoff=0)
+        net.add_command(label="SSH tunnels…", command=self.open_tunnels)
+        net.add_command(label="🌐 Proxies (SOCKS5 / HTTP)…", command=self.open_proxies)
+        net.add_command(label="Serial ports on this PC…", command=self.show_serial_ports)
+        net.add_command(label="🔎 Network scan…", command=self.open_netscan)
+        net.add_command(label="Local servers (TFTP / HTTP)…", command=self.open_localsrv)
+        net.add_command(label="⟳ Check all servers now", command=self.refresh_status)
+        tools.add_cascade(label="Network", menu=net)
+        cred = tk.Menu(tools, tearoff=0)
+        cred.add_command(label="👤 Identities (saved logins)…", command=self.open_identities)
+        cred.add_command(label="🔑 Set up keys for all servers…", command=self.open_keys)
+        cred.add_command(label="🛡 Trusted host keys…", command=self.open_known_hosts)
+        cred.add_separator()
+        cred.add_command(label="Forget ALL saved passwords…", command=self.forget_all_passwords)
+        tools.add_cascade(label="Credentials", menu=cred)
+        tools.add_separator()
+        tools.add_command(label="⚙ Preferences…", command=self.open_prefs)
+        tools.add_command(label="▶ Play a terminal recording…", command=self.play_recording)
+        tools.add_command(label="📝 Notes…", command=self.open_notes)
+        tools.add_command(label="📄 Open the log file", command=self.open_log)
         bar.add_cascade(label="Tools", menu=tools)
         help_m = tk.Menu(bar, tearoff=0)
         help_m.add_command(label="\U0001f4d6 Quick start guide (README)", command=self.open_readme)
-        help_m.add_command(label=f"\u2139 About {COMPANY} RC", command=self.about)
+        help_m.add_command(label="Keyboard shortcuts", command=self.show_shortcuts)
+        help_m.add_command(label=f"ℹ About {COMPANY} RC", command=self.about)
         bar.add_cascade(label="Help", menu=help_m)
         self.root.bind("<Control-n>", lambda _: self.add_host())
+
+    def show_shortcuts(self):
+        messagebox.showinfo("Keyboard shortcuts", (
+            "Ctrl+K\tQuick connect\nCtrl+N\tAdd server\nCtrl+W\tDisconnect this tab\n"
+            "Middle-click a tab\tDisconnect it\nCtrl+mouse wheel (terminal)\tText size\n"
+            "Ctrl+Shift+C / Ctrl+V\tCopy / paste in a terminal\n"
+            "F5 F6 F7 F8 F2 F4 (files)\tCopy, move, new folder, delete, rename, edit"), parent=self.root)
+
+    # split view, broadcast and tab helpers ------------------------------------
+    def all_terminals(self):
+        out = []
+        for name in self.nb.tabs():
+            w = self.nb.nametowidget(name)
+            if hasattr(w, "terminals"):
+                out += w.terminals()
+        return out
+
+    def cur_tab(self):
+        sel = self.nb.select()
+        return self.nb.nametowidget(sel) if sel else None
+
+    def active_terminal(self):
+        tab = self.cur_tab()
+        if tab is None or not hasattr(tab, "terminals"):
+            return None
+        act = getattr(tab, "active", None)
+        if act:
+            return act["tab"]
+        terms = tab.terminals()
+        return terms[0] if terms else None
+
+    def set_terminal_scheme(self, name):
+        import rc_terminal
+        terms = self.all_terminals()
+        if terms:
+            terms[0].choose_scheme(name)
+        else:
+            rc_terminal.save_prefs(dict(rc_terminal.load_prefs(), scheme=name))
+        self.tscheme_var.set(name)
+
+    def terminal_font_dialog(self):
+        t = self.active_terminal() or next(iter(self.all_terminals()), None)
+        if t is None:
+            messagebox.showinfo(APP_NAME, "Open a terminal tab first, then choose its font.", parent=self.root)
+            return
+        t.choose_font()
+
+    def terminal_font(self, delta):
+        t = self.active_terminal()
+        if t:
+            t.change_font(delta)
+
+    def new_split_view(self):
+        from rc_terminal import SplitTab
+        sp = SplitTab(self)
+        self.add_tab(sp, "Split view")
+        return sp
+
+    # workspaces: a named, saved split view (which servers, in which layout) --------------
+    def fill_workspace_menu(self):
+        m = self.ws_menu
+        m.delete(0, "end")
+        items = load_workspaces()
+        for w in items:
+            m.add_command(label=f"{w['name']}  ({len(w['hosts'])})", command=lambda n=w["name"]: self.open_workspace(n))
+        if not items:
+            m.add_command(label="(none saved yet - Session > Save this split view…)", state="disabled")
+
+    def save_workspace(self):
+        from rc_terminal import SplitTab
+        tab = self.cur_tab()
+        if not isinstance(tab, SplitTab) or not tab.panes:
+            messagebox.showinfo(APP_NAME, "Open a split view with at least one terminal first (Session > New split view).",
+                                parent=self.root)
+            return
+        ids = [p["host"].get("_src", p["host"]).get("id") for p in tab.panes]
+        items = load_workspaces()
+        default = getattr(tab, "_rc_title", "") or f"Workspace {len(items) + 1}"
+        name = simpledialog.askstring("Save workspace", "Name for this workspace:", initialvalue=default, parent=self.root)
+        name = (name or "").strip()
+        if not name:
+            return
+        if any(w["name"].lower() == name.lower() for w in items):
+            if not messagebox.askyesno("Save workspace", f"“{name}” already exists. Replace it?", parent=self.root):
+                return
+            items = [w for w in items if w["name"].lower() != name.lower()]
+        items.append({"name": name, "layout": tab.layout_var.get(), "hosts": [i for i in ids if i]})
+        try:
+            save_workspaces(items)
+        except OSError as e:
+            messagebox.showerror(APP_NAME, f"Could not save the workspace:\n{e}", parent=self.root)
+            return
+        tab._rc_title = name
+        self.nb.tab(tab, text=f"  {name}  ")
+        self.broadcast_changed()
+        self.status.set(f"Saved workspace “{name}” ({len(ids)} terminals)")
+
+    def open_workspace(self, name):
+        ws = next((w for w in load_workspaces() if w["name"] == name), None)
+        if ws is None:
+            messagebox.showinfo(APP_NAME, f"Workspace “{name}” was not found.", parent=self.root)
+            return
+        by_id = {h["id"]: h for h in self.hosts}
+        found = [by_id[i] for i in ws["hosts"] if i in by_id]
+        missing = len(ws["hosts"]) - len(found)
+        if not found:
+            messagebox.showinfo(APP_NAME, "None of the servers in this workspace exist any more.", parent=self.root)
+            return
+        sp = self.new_split_view()
+        sp._rc_title = ws["name"]
+        sp.layout_var.set(ws["layout"])
+        opened = sum(1 for h in found if sp.add_host(h))
+        if not opened:
+            self.nb.select(sp)
+            self.close_tab()
+            return
+        self.nb.tab(sp, text=f"  {ws['name']}  ")
+        self.status.set(f"Opened workspace “{ws['name']}”: {opened} terminal(s)"
+                        + (f", {missing} server(s) no longer exist" if missing else ""))
+
+    def manage_workspaces(self):
+        win = tk.Toplevel(self.root)
+        win.title("Workspaces")
+        win.transient(self.root)
+        win.geometry("460x320+%d+%d" % (self.root.winfo_rootx() + 140, self.root.winfo_rooty() + 120))
+        lb = tk.Listbox(win, exportselection=False)
+        lb.pack(fill="both", expand=True, padx=10, pady=10)
+        names = {h["id"]: h["name"] for h in self.hosts}
+
+        def refill():
+            lb.delete(0, "end")
+            for w in load_workspaces():
+                lb.insert("end", f"{w['name']}   -   " + ", ".join(names.get(i, "(deleted)") for i in w["hosts"]))
+
+        def chosen():
+            i = lb.curselection()
+            items = load_workspaces()
+            return (items, i[0]) if i and i[0] < len(items) else (items, None)
+
+        def do_open():
+            items, i = chosen()
+            if i is not None:
+                win.destroy()
+                self.open_workspace(items[i]["name"])
+
+        def do_rename():
+            items, i = chosen()
+            if i is None:
+                return
+            new = (simpledialog.askstring("Rename workspace", "New name:", initialvalue=items[i]["name"], parent=win) or "").strip()
+            if new and not any(w["name"].lower() == new.lower() for k, w in enumerate(items) if k != i):
+                items[i]["name"] = new
+                save_workspaces(items)
+                refill()
+
+        def do_delete():
+            items, i = chosen()
+            if i is not None and messagebox.askyesno("Workspaces", f"Delete workspace “{items[i]['name']}”?\n(The servers are not touched.)", parent=win):
+                del items[i]
+                save_workspaces(items)
+                refill()
+        bar = ttk.Frame(win)
+        bar.pack(fill="x", padx=10, pady=(0, 10))
+        ttk.Button(bar, text="Open", command=do_open).pack(side="left")
+        ttk.Button(bar, text="Rename…", command=do_rename).pack(side="left", padx=6)
+        ttk.Button(bar, text="Delete", command=do_delete).pack(side="left")
+        ttk.Button(bar, text="Close", command=win.destroy).pack(side="right")
+        lb.bind("<Double-1>", lambda e: do_open())
+        refill()
+        self.theme.paint(win)
+
+    def server_to_split(self):
+        h = self.current()
+        if not h:
+            messagebox.showinfo(APP_NAME, "Select a server on the left first.", parent=self.root)
+            return
+        from rc_terminal import SplitTab
+        cur = self.cur_tab()
+        tabs = [self.nb.nametowidget(t) for t in self.nb.tabs()]
+        sp = cur if isinstance(cur, SplitTab) else next((t for t in tabs if isinstance(t, SplitTab)), None)
+        if sp is None:
+            sp = self.new_split_view()
+        self.nb.select(sp)
+        sp.add_host(h)
+
+    def duplicate_session(self):
+        t = self.active_terminal()
+        tab = self.cur_tab()
+        if t is None:
+            messagebox.showinfo(APP_NAME, "Open an SSH terminal tab first.", parent=self.root)
+            return
+        from rc_terminal import SplitTab, TerminalTab
+        if isinstance(tab, SplitTab):
+            tab.add_host(t.host)
+            return
+        new = TerminalTab(self, t.host, *t.creds)
+        self.add_tab(new, f"{t.kind.capitalize() if t.kind != 'ssh' else 'SSH'} · {t.host['name']}")
+        new.t.focus_set()
+
+    def rename_tab(self):
+        tab = self.cur_tab()
+        if tab is None or tab is self.home:
+            return
+        old = self.tab_title_base(tab)
+        new = simpledialog.askstring("Rename tab", "New tab name:", initialvalue=old, parent=self.root)
+        if new and new.strip():
+            tab._rc_title = new.strip()
+            self.refresh_tab_title(tab)
+            self.broadcast_changed()
+
+    def confirm_broadcast(self):
+        if getattr(self, "_bcast_ok", False):
+            return True
+        ok = messagebox.askokcancel(
+            "Broadcast", "With Broadcast on, everything you type or paste in one of the ticked terminals is sent to "
+            "ALL the ticked terminals, including Enter. Be careful with commands that change things.\n\n"
+            "Turn Broadcast on?", icon="warning", parent=self.root)
+        self._bcast_ok = ok
+        return ok
+
+    def broadcast_peers(self, src):
+        return [t for t in self.all_terminals() if t is not src and t.bcast_var.get() and not t.closed]
+
+    def broadcast_all(self, on):
+        terms = self.all_terminals()
+        if not terms:
+            messagebox.showinfo(APP_NAME, "No terminal is open.", parent=self.root)
+            return
+        if on and not self.confirm_broadcast():
+            return
+        for t in terms:
+            t.bcast_var.set(on)
+        self.broadcast_changed()
+
+    def broadcast_changed(self):
+        """Refresh the tab marks, the split-view boxes and the status bar after Broadcast was ticked/unticked."""
+        from rc_terminal import SplitTab
+        for name in self.nb.tabs():
+            w = self.nb.nametowidget(name)
+            if isinstance(w, SplitTab):
+                w.refresh_broadcast()
+            if hasattr(w, "terminals"):
+                self.refresh_tab_title(w)
+        n = len([t for t in self.all_terminals() if t.bcast_var.get()])
+        self.status.set(f"📡 Broadcast ON for {n} terminal(s): typing in one goes to all of them" if n else "Broadcast off")
+
+    def duplicate_host(self):
+        h = self.current()
+        if not h:
+            messagebox.showinfo(APP_NAME, "Select a server first.", parent=self.root)
+            return
+        c = json.loads(json.dumps({k: v for k, v in h.items() if not k.startswith("_")}))
+        c["id"] = uuid.uuid4().hex
+        c["name"] = h["name"] + " (copy)"
+        c["favorite"], c["last_connected"] = False, 0
+        self.hosts.append(c)
+        self.commit(c["id"])
+        self.status.set(f"Duplicated {h['name']}")
+
+    def export_csv(self):
+        path = filedialog.asksaveasfilename(title="Export servers", defaultextension=".csv",
+                                            initialfile="rc-servers.csv", filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["name", "address", "group", "user"])
+                for h in sorted(self.hosts, key=lambda h: (h["group"].lower(), h["name"].lower())):
+                    w.writerow([h["name"], h["address"], h["group"], h["user"]])
+        except OSError as e:
+            messagebox.showerror(APP_NAME, f"Could not write that file:\n{e}", parent=self.root)
+            return
+        self.status.set(f"Exported {len(self.hosts)} server(s) (names, addresses, groups and users only - no passwords)")
 
     def open_readme(self):
         """Help > Quick start guide: README.md shown as a formatted web page in the default browser."""
@@ -2359,6 +3289,10 @@ class App:
                                   tags=("extra",) if c.get("extra") else ())
         for key, b in self.buttons.items():
             b.configure(text=SHORT_LABEL[key] + (" ▾" if counts.get(key, 0) > 1 else ""))
+            b.pack_forget()
+        for key, b in self.buttons.items():       # Telnet and Serial only appear on servers that have such a connection
+            if key not in OPTIONAL_ACTIONS or counts.get(key):
+                b.pack(side="left", padx=(6, 0))
         if not h:
             self.title_var.set("")
             self.detail_var.set("")
@@ -2465,100 +3399,6 @@ class App:
             messagebox.showwarning("Import", f"Imported {added}. Skipped {len(skipped)} that looked wrong or were "
                                              "duplicates:\n\n" + "\n".join(skipped[:15]) + ("\n…" if len(skipped) > 15 else ""))
 
-    def export_everything(self):
-        """File > Export everything: one .rcpack file to carry servers, tunnels, snippets, settings, trusted host
-        keys (and, protected by a passphrase, saved passwords and SSH keys) to RC on another PC."""
-        import rc_backup
-        phrase = ""
-        if messagebox.askyesno(
-                "Export everything",
-                "Also include your SAVED PASSWORDS and SSH PRIVATE KEYS?\n\n"
-                "They are locked inside the file with a passphrase you choose now, because Windows only lets "
-                "this PC read the passwords RC saved here.\n\nYes = include them     No = servers and settings only",
-                parent=self.root):
-            while True:
-                phrase = simpledialog.askstring("Pack passphrase", "Choose a passphrase for the pack\n"
-                                                "(you will need it to import on the other PC):", show="*", parent=self.root)
-                if phrase is None:
-                    return
-                if len(phrase) < 6:
-                    messagebox.showwarning("Pack passphrase", "Use at least 6 characters.", parent=self.root)
-                    continue
-                again = simpledialog.askstring("Pack passphrase", "Type the passphrase again:", show="*", parent=self.root)
-                if again is None:
-                    return
-                if again == phrase:
-                    break
-                messagebox.showwarning("Pack passphrase", "The two did not match. Try again.", parent=self.root)
-        path = filedialog.asksaveasfilename(
-            title="Export everything", defaultextension=rc_backup.PACK_EXT, initialfile=rc_backup.default_pack_name(),
-            filetypes=[("RC export", "*" + rc_backup.PACK_EXT), ("All files", "*.*")], parent=self.root)
-        if not path:
-            return
-        try:
-            s = rc_backup.export_pack(path, self.hosts, phrase)
-        except Exception as e:
-            log.exception("Export failed")
-            messagebox.showerror("Export everything", f"The export failed:\n{e}", parent=self.root)
-            return
-        extra = (f"\n{s['passwords']} saved password(s) and {s['keys']} SSH key(s) locked with your passphrase."
-                 if phrase else "\nNo passwords or keys were included.")
-        self.status.set(f"Exported {s['servers']} server(s) to {os.path.basename(path)}")
-        messagebox.showinfo("Export everything",
-                            f"Saved {path}\n\n{s['servers']} server(s), {s['tunnels']} tunnel(s), {s['snippets']} snippet(s), "
-                            f"{s['trusted_keys']} trusted host key(s), settings." + extra +
-                            "\n\nOn the other PC: File > Import everything.", parent=self.root)
-
-    def import_everything(self):
-        """File > Import everything: read an .rcpack made by Export everything (this or another PC)."""
-        import rc_backup
-        path = filedialog.askopenfilename(
-            title="Import everything", filetypes=[("RC export", "*" + rc_backup.PACK_EXT), ("All files", "*.*")],
-            parent=self.root)
-        if not path:
-            return
-        try:
-            pack = rc_backup.open_pack(path)
-        except rc_backup.PackError as e:
-            messagebox.showerror("Import everything", str(e), parent=self.root)
-            return
-        ans = messagebox.askyesnocancel(
-            "Import everything",
-            f"{pack.describe()}\n\nYes = MERGE: add new servers and update matching ones, keep everything else here.\n"
-            "No = REPLACE: make this RC look exactly like the pack.\nCancel = stop.\n\n"
-            "Your current files are copied to a backups folder first either way.", parent=self.root)
-        if ans is None:
-            return
-        phrase = ""
-        if pack.has_secrets:
-            phrase = simpledialog.askstring("Pack passphrase", "Passphrase for the saved passwords and keys in this pack\n"
-                                            "(leave empty to import without them):", show="*", parent=self.root) or ""
-        if ans is False and not messagebox.askyesno(
-                "Import everything", "REPLACE removes servers that are not in the pack.\nAre you sure?", parent=self.root):
-            return
-        try:
-            new_hosts, rep = rc_backup.import_pack(pack, self.hosts, "merge" if ans else "replace", phrase)
-        except rc_backup.PackError as e:
-            messagebox.showerror("Import everything", str(e), parent=self.root)
-            return
-        except Exception as e:
-            log.exception("Import failed")
-            messagebox.showerror("Import everything", f"The import failed; nothing was changed in your server list:\n{e}",
-                                 parent=self.root)
-            return
-        self.hosts[:] = new_hosts
-        self.commit()
-        self.status.set(f"Imported: {rep['added']} added, {rep['updated']} updated")
-        msg = (f"Servers: {rep['added']} added, {rep['updated']} updated, {rep['unchanged']} already the same.\n"
-               f"Passwords restored: {rep['passwords']}    SSH keys restored: {rep['keys']}\n"
-               f"Snippets: {rep['snippets']}    Trusted host keys: {rep['known_hosts']}\n\n"
-               f"Previous files saved in:\n{rep['backup']}")
-        if rep["settings"]:
-            msg += "\n\nSettings were imported - restart RC to see the colour theme."
-        if rep["skipped"]:
-            msg += "\n\nSkipped: " + "; ".join(rep["skipped"][:6])
-        messagebox.showinfo("Import everything", msg, parent=self.root)
-
     # menus / clicks
     def on_double(self, e):
         iid = self.tree.identify_row(e.y)
@@ -2575,9 +3415,13 @@ class App:
         if not h:
             return
         m = tk.Menu(self.root, tearoff=0)
+        more = tk.Menu(m, tearoff=0)          # the less-used connections go in a submenu so the menu stays short
         for c in connection_list(h):
-            m.add_command(label=self.conn_text(c), command=lambda c=c: self.do(c["action"], c["over"]))
+            (more if c["action"] in SECONDARY_ACTIONS and not c.get("extra") else m).add_command(
+                label=self.conn_text(c), command=lambda c=c: self.do(c["action"], c["over"]))
+        m.add_cascade(label="More (ping, wake, mail, shares ...)", menu=more)
         m.add_separator()
+        m.add_command(label="📝 Notes…", command=lambda: self.open_notes(h["id"]))
         m.add_command(label="Copy address", command=lambda: (self.root.clipboard_clear(),
                                                              self.root.clipboard_append(h["address"])))
         m.add_command(label="☆ Remove from favorites" if h.get("favorite") else "★ Add to favorites",
@@ -2589,9 +3433,32 @@ class App:
     def tab_menu(self, e):
         try:
             self.nb.select(self.nb.index(f"@{e.x},{e.y}"))
+            self.fill_tab_popup()
             self.tab_popup.tk_popup(e.x_root, e.y_root)
         except tk.TclError:
             pass
+
+    def fill_tab_popup(self):
+        m, tab = self.tab_popup, self.cur_tab()
+        m.delete(0, "end")
+        if tab is None or tab is self.home:
+            m.add_command(label="(nothing to do for this tab)", state="disabled")
+            return
+        if hasattr(tab, "terminals"):
+            m.add_command(label="Duplicate this session", command=self.duplicate_session)
+            term = self.active_terminal()
+            if term is not None:
+                m.add_checkbutton(label="📡 Broadcast input with other ticked terminals", variable=term.bcast_var,
+                                  command=term.bcast_changed)
+        m.add_command(label="Rename tab…", command=self.rename_tab)
+        m.add_command(label="🔓 Unlock tab" if getattr(tab, "_rc_locked", False) else "🔒 Lock tab (can't be closed by accident)", command=self.toggle_lock)
+        m.add_separator()
+        closer = tk.Menu(m, tearoff=0)
+        closer.add_command(label="Close other tabs", command=lambda: self.close_tabs("others"))
+        closer.add_command(label="Close tabs to the right", command=lambda: self.close_tabs("right"))
+        closer.add_command(label="Close tabs to the left", command=lambda: self.close_tabs("left"))
+        m.add_cascade(label="Close several tabs", menu=closer)
+        m.add_command(label="Disconnect / close tab", command=self.close_tab)
 
     def middle_close(self, e):
         try:
@@ -2600,9 +3467,86 @@ class App:
         except tk.TclError:
             pass
 
+    # tab management ----------------------------------------------------------
+    def tab_title_base(self, w):
+        return getattr(w, "_rc_title", None) or self.nb.tab(w, "text").strip().replace("📡 ", "").replace("🔒 ", "")
+
+    def refresh_tab_title(self, w):
+        on = hasattr(w, "terminals") and any(t.bcast_var.get() for t in w.terminals())
+        self.nb.tab(w, text="  " + ("🔒 " if getattr(w, "_rc_locked", False) else "") + ("📡 " if on else "") + self.tab_title_base(w) + "  ")
+
+    def toggle_lock(self, w=None):
+        """Lock a tab so it cannot be closed by accident (close, middle-click, Disconnect all, Close other tabs)."""
+        w = w or self.cur_tab()
+        if w is None or w is self.home:
+            return False
+        w._rc_locked = not getattr(w, "_rc_locked", False)
+        self.refresh_tab_title(w)
+        self.status.set("Tab locked: it will not close until you unlock it" if w._rc_locked else "Tab unlocked")
+        return w._rc_locked
+
+    def close_tabs(self, which):
+        """Close 'others', the tabs to the 'right' or the tabs to the 'left' of the current one (locked tabs and the Servers tab stay)."""
+        cur = self.cur_tab()
+        order = [self.nb.nametowidget(t) for t in self.nb.tabs()]
+        if cur not in order:
+            return 0
+        i = order.index(cur)
+        picked = {"others": order[:i] + order[i + 1:], "right": order[i + 1:], "left": order[:i]}[which]
+        targets = [t for t in picked if t is not self.home and not getattr(t, "_rc_locked", False)]
+        if not targets or not self.confirm_close(targets):
+            return 0
+        for tab in targets:
+            if hasattr(tab, "close"):
+                tab.close()
+            self.nb.forget(tab)
+            tab.destroy()
+        kept = sum(1 for t in picked if getattr(t, "_rc_locked", False))
+        self.status.set(f"Closed {len(targets)} tab(s)" + (f", kept {kept} locked" if kept else ""))
+        return len(targets)
+
+    def tab_press(self, e):
+        try:
+            self.drag_tab = self.nb.nametowidget(self.nb.tabs()[self.nb.index(f"@{e.x},{e.y}")])
+        except (tk.TclError, IndexError):
+            self.drag_tab = None
+
+    def tab_drag(self, e):
+        """Drag a tab sideways to reorder it (the Servers tab stays first)."""
+        w = self.drag_tab
+        if w is None or w is self.home:
+            return
+        try:
+            target = self.nb.index(f"@{e.x},{e.y}")
+        except tk.TclError:
+            return
+        if target >= 1 and target != self.nb.index(w):
+            self.nb.insert(target, w)
+
+    def handle_shortcut(self, keysym, ctrl, shift):
+        """Ctrl+1..9, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Shift+D. Returns True when it was one of ours (so a terminal does not also send it)."""
+        if not ctrl:
+            return False
+        tabs = self.nb.tabs()
+        if keysym in tuple("123456789") and tabs:
+            n = int(keysym)
+            self.nb.select(tabs[-1] if n == 9 else tabs[min(n - 1, len(tabs) - 1)])
+            return True
+        if keysym in ("Tab", "ISO_Left_Tab") and tabs:
+            step = -1 if (shift or keysym == "ISO_Left_Tab") else 1
+            self.nb.select(tabs[(tabs.index(self.nb.select()) + step) % len(tabs)])
+            return True
+        if shift and keysym.lower() == "d":
+            self.duplicate_session()
+            return True
+        return False
+
     def close_tab(self):
         tab = self.nb.nametowidget(self.nb.select()) if self.nb.select() else None
         if tab is None or tab is self.home:
+            return
+        if getattr(tab, "_rc_locked", False):
+            self.status.set("That tab is locked (right-click it > Unlock tab).")
             return
         if not self.confirm_close([tab]):
             return
@@ -2623,7 +3567,7 @@ class App:
 
     def disconnect_all(self):
         tabs = [self.nb.nametowidget(t) for t in self.nb.tabs()]
-        tabs = [t for t in tabs if t is not self.home]
+        tabs = [t for t in tabs if t is not self.home and not getattr(t, "_rc_locked", False)]
         if not tabs or not self.confirm_close(tabs):
             return
         for tab in tabs:
@@ -2640,12 +3584,13 @@ class App:
             return
         if over:
             h = variant(h, over)
-        if action in ("rdp", "vnc", "rustdesk", "web", "smb", "ps", "ssh_ext", "ping", "verify"):
+        h = effective_host(h)   # a saved login (identity) replaces the server's own username / password / key
+        if action in ("rdp", "vnc", "rustdesk", "web", "smb", "ps", "ssh_ext", "ping", "verify", "telnet"):
             h = self.live_address(h)  # SSH and file transfers pick their own address when they connect
         log.info("Action %s on %s (%s)", action, h.get("name"), h.get("address"))
         try:
             getattr(self, "act_" + action)(h)
-            if action in ("ssh", "files", "rdp", "vnc", "rustdesk", "web", "ps", "ssh_ext", "smb"):
+            if action in ("ssh", "files", "stats", "telnet", "serial", "rdp", "vnc", "rustdesk", "web", "ps", "ssh_ext", "smb"):
                 self.mark_connected(h)
         except Exception as e:
             log.exception("Action %s on %s failed", action, h.get("address"))
@@ -2689,6 +3634,7 @@ class App:
 
     def credentials(self, h, allow_anonymous=False):
         """Returns (user, password) or None if cancelled."""
+        h = effective_host(h)
         user = h["user"] or self.ask_user(h)
         if not user and not allow_anonymous:
             return None
@@ -2721,6 +3667,43 @@ class App:
             t = TerminalTab(self, h, *c)
             self.add_tab(t, f"SSH · {h['name']}")
             t.t.focus_set()
+
+    def login_hint(self, h):
+        """(user, password) saved for this server, or ('', '') - used for ${user} / ${password} in login scripts of
+        Telnet and Serial sessions, which have no SSH login of their own."""
+        e = effective_host(h)
+        pw = unprotect_password(e["password_enc"]) if e.get("password_enc") else ""
+        return e.get("user") or "", pw
+
+    def act_telnet(self, h):
+        from rc_terminal import TerminalTab
+        t = TerminalTab(self, dict(h, _kind="telnet"), *self.login_hint(h))
+        self.add_tab(t, f"Telnet · {h['name']}")
+        t.t.focus_set()
+
+    def act_serial(self, h):
+        if not (h.get("serial_spec") or "").strip():
+            raise RuntimeError("This serial connection has no COM port. Add one under Edit > More connections (type Serial).")
+        from rc_terminal import TerminalTab
+        t = TerminalTab(self, dict(h, _kind="serial"), *self.login_hint(h))
+        self.add_tab(t, f"Serial · {h['name']}")
+        t.t.focus_set()
+
+    def show_serial_ports(self):
+        import rc_transport
+        ports = rc_transport.list_serial_ports()
+        messagebox.showinfo("Serial ports", ("\n".join(f"{d}   {desc}" for d, desc in ports) if ports else
+                            "No serial ports found (or the 'pyserial' package is missing)."), parent=self.root)
+
+    def act_stats(self, h):
+        if h.get("glances"):          # the stats come from Glances' web API: no SSH login needed
+            from rc_monitor import MonitorTab
+            self.add_tab(MonitorTab(self, h, "", ""), f"Stats · {h['name']}")
+            return
+        c = self.credentials(h)
+        if c:
+            from rc_monitor import MonitorTab
+            self.add_tab(MonitorTab(self, h, *c), f"Stats · {h['name']}")
 
     def act_files(self, h):
         c = self.credentials(h, allow_anonymous=h["file_mode"] != "SFTP")

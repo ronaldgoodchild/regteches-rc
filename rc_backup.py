@@ -1,356 +1,360 @@
-"""RC export / import: pack everything RC knows into ONE file and bring it back on another PC.
+"""REGTeches RC - encrypted backup and restore (File > Back up everything / Restore from a backup).
 
-  File > Export everything...   writes  RC_export_<PC>_<date>.rcpack   (a zip with a manifest)
-  File > Import everything...   reads such a file, merging into (or replacing) what this RC already has
+Why: saved passwords in hosts.json are encrypted for ONE Windows account on ONE PC (DPAPI), so copying hosts.json to
+another PC loses them. A backup opens the saved passwords, then locks the whole bundle with a password you choose
+(scrypt key + AES-256-GCM), so it can be restored on any PC; restoring re-encrypts them for that PC and account.
 
-What goes in the pack
-  servers (hosts.json: groups, extra connections, tunnels, bookmarks, favorites, jump hosts, notes ...),
-  snippets.json, settings.json (colour theme ...), terminal.json (font size), known_hosts (trusted SSH host keys)
-  and - only if you give a pack passphrase - the SAVED PASSWORDS and the SSH PRIVATE KEYS the servers use.
-
-Why a passphrase: saved passwords are protected by Windows (DPAPI) for ONE user on ONE PC; the encrypted blobs in
-hosts.json are useless anywhere else. On export RC decrypts them and re-encrypts them (with the passphrase you
-choose) inside the pack; on import it re-protects them for the new PC. Without a passphrase nothing secret is written.
-
-Kept free of tkinter so it can be tested without a window. Developed by Ronald Goodchild - REGTeches.
-"""
+Contents: servers (with their extra connections, tunnels, bookmarks), snippets, workspaces, identities, proxies, notes and
+trusted host keys. Not included: SSH key files themselves (only their paths), command history, and settings.
+The pure functions at the top can be tested without a window."""
 
 import base64
-import copy
-import io
 import json
 import os
-import re
-import shutil
-import socket
 import time
-import zipfile
 
 import rc_manager as core
 
-PACK_FORMAT = 1
-PACK_EXT = ".rcpack"
-MAX_MEMBER = 25 * 1024 * 1024        # refuse anything bigger inside a pack (zip-bomb guard)
-KNOWN_MEMBERS = ("manifest.json", "hosts.json", "snippets.json", "settings.json", "terminal.json", "known_hosts",
-                 "secrets.enc")
-SECRET_FIELDS = ("password_enc", "rustdesk_password_enc")
 log = core.log
 
-
-class PackError(Exception):
-    """A problem the person can read: wrong passphrase, not an RC pack, damaged file ..."""
-
-
-# ─── helpers ─────────────────────────────────────────────────────────────────
-
-def default_pack_name():
-    return f"RC_export_{socket.gethostname()}_{time.strftime('%Y-%m-%d')}{PACK_EXT}"
+FORMAT = "RC-BACKUP"
+VERSION = 1
+AAD = b"RC-BACKUP/1"
+SCRYPT = {"n": 2 ** 15, "r": 8, "p": 1}
 
 
-def _fernet(passphrase, salt):
-    from cryptography.fernet import Fernet
+class BackupError(Exception):
+    """A readable problem: wrong password, not a backup, damaged or too new."""
+
+
+# ─── encryption ──────────────────────────────────────────────────────────────
+
+def _key(password, salt, n, r, p):
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-    key = Scrypt(salt=salt, length=32, n=2 ** 15, r=8, p=1).derive(passphrase.encode("utf-8"))
-    return Fernet(base64.urlsafe_b64encode(key))
+    return Scrypt(salt=salt, length=32, n=n, r=r, p=p).derive(password.encode("utf-8"))
 
 
-def _read_file(path):
+def encrypt(bundle, password):
+    """dict -> bytes (a JSON container holding the AES-GCM encrypted bundle)."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    if not password:
+        raise BackupError("Choose a password for the backup.")
+    salt, nonce = os.urandom(16), os.urandom(12)
+    data = AESGCM(_key(password, salt, **SCRYPT)).encrypt(nonce, json.dumps(bundle).encode("utf-8"), AAD)
+    box = {"format": FORMAT, "version": VERSION, "kdf": dict(name="scrypt", salt=base64.b64encode(salt).decode(), **SCRYPT),
+           "nonce": base64.b64encode(nonce).decode(), "data": base64.b64encode(data).decode()}
+    return json.dumps(box, indent=1).encode("utf-8")
+
+
+def decrypt(blob, password):
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    try:
+        box = json.loads(blob.decode("utf-8-sig"))
+        if box.get("format") != FORMAT:
+            raise ValueError
+        kdf = box["kdf"]
+        salt, nonce, data = (base64.b64decode(x) for x in (kdf["salt"], box["nonce"], box["data"]))
+        n, r, p = int(kdf["n"]), int(kdf["r"]), int(kdf["p"])
+    except (ValueError, KeyError, TypeError, AttributeError, UnicodeDecodeError):
+        raise BackupError("That file is not an RC backup (or it is damaged).")
+    if int(box.get("version", 0)) > VERSION:
+        raise BackupError("This backup was made by a newer RC. Update RC first.")
+    if not 2 ** 10 <= n <= 2 ** 20 or r > 32 or p > 8:
+        raise BackupError("That file is not an RC backup (or it is damaged).")
+    try:
+        plain = AESGCM(_key(password, salt, n, r, p)).decrypt(nonce, data, AAD)
+    except InvalidTag:
+        raise BackupError("Wrong password, or the file is damaged.")
+    try:
+        bundle = json.loads(plain.decode("utf-8"))
+    except ValueError:
+        raise BackupError("The backup could not be read.")
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("hosts"), list):
+        raise BackupError("The backup could not be read.")
+    return bundle
+
+
+# ─── making and applying a bundle ────────────────────────────────────────────
+
+def _open(blob):
+    """DPAPI blob -> plain text ('' if it cannot be opened here)."""
+    if not blob:
+        return ""
+    try:
+        return core.unprotect_password(blob) or ""
+    except Exception:
+        return ""
+
+
+def _lock(text):
+    return core.protect_password(text) if text else ""
+
+
+def portable_host(h):
+    """A copy of a server with its saved passwords written in clear (they only ever exist inside the encrypted bundle)."""
+    out = {k: json.loads(json.dumps(v)) for k, v in h.items() if not k.startswith("_")}
+    lost = 0
+    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password")):
+        blob = out.pop(blob_key, "")
+        out[plain_key] = _open(blob)
+        lost += bool(blob and not out[plain_key])
+    for c in out.get("connections", []):
+        blob = c.pop("password_enc", "")
+        if blob:
+            c["password"] = _open(blob)
+            lost += not c["password"]
+    return out, lost
+
+
+def restore_host(d):
+    h = json.loads(json.dumps(d))
+    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password")):
+        h[blob_key] = _lock(h.pop(plain_key, "") or "")
+    for c in h.get("connections", []):
+        pw = c.pop("password", "")
+        if pw:
+            c["password_enc"] = _lock(pw)
+    return core.sanitize_host(h)
+
+
+def read_known_hosts():
+    try:
+        with open(core.KNOWN_HOSTS, "r", encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def make_bundle(hosts):
+    """Everything RC keeps, in one dict. Returns (bundle, number of saved passwords that could not be opened)."""
+    lost, out_hosts = 0, []
+    for h in hosts:
+        ph, n = portable_host(h)
+        out_hosts.append(ph)
+        lost += n
+    idents = []
+    for i in core.load_identities():
+        i = dict(i)
+        i["secret"] = _open(i.pop("secret_enc", ""))
+        idents.append(i)
+    proxies = []
+    for p in core.load_proxies():
+        p = dict(p)
+        p["password"] = _open(p.pop("password_enc", ""))
+        proxies.append(p)
+    return ({"app": "RC", "app_version": core.APP_VERSION, "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+             "hosts": out_hosts, "snippets": core.load_snippets(), "workspaces": core.load_workspaces(),
+             "identities": idents, "proxies": proxies, "known_hosts": read_known_hosts(),
+             "notes": __import__("rc_notes").load_notes()}, lost)
+
+
+def _match_key(h):
+    return (h.get("name", "").lower(), h.get("address", "").lower())
+
+
+def merge_list(existing, incoming, replace, key):
+    """Merge two lists of dicts by `key(item)`. Returns (merged, added, replaced, skipped)."""
+    merged, added, replaced, skipped = list(existing), 0, 0, 0
+    index = {key(x): n for n, x in enumerate(merged)}
+    for item in incoming:
+        k = key(item)
+        if k in index:
+            if replace:
+                merged[index[k]] = item
+                replaced += 1
+            else:
+                skipped += 1
+        else:
+            index[k] = len(merged)
+            merged.append(item)
+            added += 1
+    return merged, added, replaced, skipped
+
+
+def apply_bundle(bundle, hosts, replace):
+    """Merge a bundle into this PC's data. `hosts` is the live server list. Writes the small stores and returns
+    (new_hosts, report); the caller saves/refreshes the server list. replace=True overwrites matches, else new ones only."""
+    report = {}
+    # servers: match by id, else by name + address
+    current, incoming = list(hosts), [restore_host(h) for h in bundle["hosts"] if isinstance(h, dict)]
+    id_map, by_id, by_name = {}, {h["id"]: n for n, h in enumerate(current)}, {_match_key(h): n for n, h in enumerate(current)}
+    added = replaced = skipped = 0
+    for h in incoming:
+        n = by_id.get(h["id"], by_name.get(_match_key(h)))
+        if n is None:
+            current.append(h)
+            by_id[h["id"]], by_name[_match_key(h)] = len(current) - 1, len(current) - 1
+            id_map[h["id"]] = h["id"]
+            added += 1
+        elif replace:
+            keep = current[n]["id"]
+            id_map[h["id"]] = keep
+            h["id"] = keep
+            current[n] = h
+            replaced += 1
+        else:
+            id_map[h["id"]] = current[n]["id"]
+            skipped += 1
+    for h in current:                         # a jump server that was matched to an existing entry keeps pointing at it
+        if h.get("jump_host") in id_map:
+            h["jump_host"] = id_map[h["jump_host"]]
+    report["servers"] = (added, replaced, skipped)
+
+    snips, a, r, s = merge_list(core.load_snippets(), [x for x in bundle.get("snippets", []) if isinstance(x, dict) and x.get("name") and x.get("command")],
+                                replace, lambda x: x.get("id") or x["name"])
+    if a or r:
+        core.save_snippets(snips)
+    report["snippets"] = (a, r, s)
+
+    wss = []
+    for w in bundle.get("workspaces", []):
+        if isinstance(w, dict) and w.get("name") and isinstance(w.get("hosts"), list):
+            wss.append(dict(w, hosts=[id_map.get(i, i) for i in w["hosts"]]))
+    merged, a, r, s = merge_list(core.load_workspaces(), wss, replace, lambda x: x["name"].lower())
+    if a or r:
+        core.save_workspaces(merged)
+    report["workspaces"] = (a, r, s)
+
+    idents = []
+    for i in bundle.get("identities", []):
+        if isinstance(i, dict):
+            i = dict(i)
+            i["secret_enc"] = _lock(i.pop("secret", "") or "")
+            c = core.clean_identity(i)
+            if c:
+                idents.append(c)
+    merged, a, r, s = merge_list(core.load_identities(), idents, replace, lambda x: x["id"])
+    if a or r:
+        core.save_identities(merged)
+    report["identities"] = (a, r, s)
+
+    proxies = []
+    for p in bundle.get("proxies", []):
+        if isinstance(p, dict):
+            p = dict(p)
+            p["password_enc"] = _lock(p.pop("password", "") or "")
+            c = core.clean_proxy(p)
+            if c:
+                proxies.append(c)
+    merged, a, r, s = merge_list(core.load_proxies(), proxies, replace, lambda x: x["id"])
+    if a or r:
+        core.save_proxies(merged)
+    report["proxies"] = (a, r, s)
+
+    import rc_notes
+    inc_notes = []
+    for n in bundle.get("notes", []):
+        n = rc_notes.clean_note(n)
+        if n:
+            n["server"] = id_map.get(n["server"], n["server"])
+            inc_notes.append(n)
+    merged, a, r, s = merge_list(rc_notes.load_notes(), inc_notes, replace, lambda x: x["id"])
+    if a or r:
+        rc_notes.save_notes(merged)
+    report["notes"] = (a, r, s)
+
+    have = set(read_known_hosts().splitlines())
+    new_lines = [l for l in (bundle.get("known_hosts") or "").splitlines() if l.strip() and l not in have]
+    if new_lines:
+        with core.KNOWN_HOSTS_LOCK:
+            with open(core.KNOWN_HOSTS, "a", encoding="utf-8") as f:
+                existing = read_known_hosts()
+                f.write(("" if not existing or existing.endswith("\n") else "\n") + "\n".join(new_lines) + "\n")
+    report["host_keys"] = len(new_lines)
+    return current, report
+
+
+def describe(report):
+    def line(label, t):
+        a, r, s = t
+        bits = [f"{a} added"] + ([f"{r} replaced"] if r else []) + ([f"{s} already there, left alone"] if s else [])
+        return f"{label}: " + ", ".join(bits)
+    out = [line("Servers", report["servers"]), line("Snippets", report["snippets"]), line("Workspaces", report["workspaces"]),
+           line("Identities", report["identities"]), line("Proxies", report["proxies"]), line("Notes", report.get("notes", (0, 0, 0))),
+           f"Trusted host keys added: {report['host_keys']}"]
+    return "\n".join(out)
+
+
+# ─── the two menu commands ───────────────────────────────────────────────────
+
+def backup_dialog(app):
+    from tkinter import filedialog, messagebox, simpledialog
+    pw = simpledialog.askstring("Back up everything", "Choose a password for the backup file.\n"
+                                "You will need it to restore. It cannot be recovered.", show="•", parent=app.root)
+    if not pw:
+        return None
+    if len(pw) < 8 and not messagebox.askyesno("Back up everything", "That password is short (under 8 characters). Use it anyway?",
+                                               parent=app.root):
+        return None
+    if simpledialog.askstring("Back up everything", "Type the password again.", show="•", parent=app.root) != pw:
+        messagebox.showerror("Back up everything", "The two passwords were not the same. Nothing was saved.", parent=app.root)
+        return None
+    path = filedialog.asksaveasfilename(parent=app.root, title="Save the backup", defaultextension=".rcbackup",
+                                        initialfile="RC-backup-" + time.strftime("%Y%m%d") + ".rcbackup",
+                                        filetypes=[("RC backup", "*.rcbackup"), ("All files", "*.*")])
+    if not path:
+        return None
+    try:
+        bundle, lost = make_bundle(app.hosts)
+        blob = encrypt(bundle, pw)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(blob)
+        os.replace(tmp, path)
+    except (OSError, BackupError) as e:
+        messagebox.showerror("Back up everything", f"Could not make the backup:\n{e}", parent=app.root)
+        return None
+    keys = sum(1 for h in app.hosts if h.get("key_file"))
+    note = (f"\n\n{lost} saved password(s) could not be opened (they belong to another Windows account) and were left out." if lost else "")
+    note += (f"\n\n{keys} server(s) use an SSH key file. The key files themselves are not in the backup: copy them yourself." if keys else "")
+    messagebox.showinfo("Back up everything", f"Saved {len(app.hosts)} server(s) and your other settings to:\n{path}\n\n"
+                        "Keep it and its password safe: anyone with both can read your saved passwords." + note, parent=app.root)
+    app.status.set(f"Backup saved: {path}")
+    log.info("Backup written (%d servers)", len(app.hosts))
+    return path
+
+
+def restore_dialog(app, path=None):
+    from tkinter import filedialog, messagebox, simpledialog
+    path = path or filedialog.askopenfilename(parent=app.root, title="Choose the backup file",
+                                              filetypes=[("RC backup", "*.rcbackup"), ("All files", "*.*")])
+    if not path:
+        return None
     try:
         with open(path, "rb") as f:
-            return f.read(MAX_MEMBER + 1)
-    except OSError:
+            blob = f.read()
+    except OSError as e:
+        messagebox.showerror("Restore", f"Could not read that file:\n{e}", parent=app.root)
         return None
-
-
-def _clean_host(h):
-    """Copy of a server entry with the machine-bound secrets and transient fields removed."""
-    c = copy.deepcopy({k: v for k, v in h.items() if not k.startswith("_")})
-    for f in SECRET_FIELDS:
-        c[f] = ""
-    for conn in c.get("connections", []):
-        conn.pop("password_enc", None)
-    return c
-
-
-def _key_name(path):
-    return re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(path)) or "key"
-
-
-def _collect_secrets(hosts, include_keys):
-    """{'passwords': {host_id: {...}}, 'keys': {file name: base64}} - everything that must stay encrypted."""
-    pw, keys = {}, {}
-    for h in hosts:
-        entry = {}
-        if h.get("password_enc"):
-            entry["password"] = core.unprotect_password(h["password_enc"])
-        if h.get("rustdesk_password_enc"):
-            entry["rustdesk"] = core.unprotect_password(h["rustdesk_password_enc"])
-        extra = {str(i): core.unprotect_password(c["password_enc"])
-                 for i, c in enumerate(h.get("connections", [])) if c.get("password_enc")}
-        if extra:
-            entry["extra"] = extra
-        entry = {k: v for k, v in entry.items() if v}  # a blob this PC cannot decrypt gives "", skip it
-        if entry:
-            pw[h["id"]] = entry
-        kf = h.get("key_file") or ""
-        if include_keys and kf and os.path.isfile(kf):
-            data = _read_file(kf)
-            if data is not None and len(data) <= MAX_MEMBER:
-                keys[_key_name(kf)] = base64.b64encode(data).decode("ascii")
-    return {"passwords": pw, "keys": keys}
-
-
-# ─── export ──────────────────────────────────────────────────────────────────
-
-def export_pack(path, hosts, passphrase="", include_keys=True):
-    """Write the pack. Returns a summary dict (counts) for the confirmation message."""
-    members = {}
-    members["hosts.json"] = json.dumps({"version": core.HOSTS_VERSION, "hosts": [_clean_host(h) for h in hosts]},
-                                       indent=2).encode("utf-8")
-    for name, src in (("snippets.json", core.SNIPPETS_FILE), ("settings.json", core.SETTINGS_FILE),
-                      ("terminal.json", os.path.join(core.APP_DIR, "terminal.json")),
-                      ("known_hosts", core.KNOWN_HOSTS)):
-        data = _read_file(src)
-        if data is not None and len(data) <= MAX_MEMBER:
-            members[name] = data
-    manifest = {"format": PACK_FORMAT, "app": "REGTeches RC", "app_version": core.APP_VERSION,
-                "created": time.strftime("%Y-%m-%d %H:%M:%S"), "from_pc": socket.gethostname(),
-                "servers": len(hosts), "secrets": False}
-    summary = {"servers": len(hosts), "passwords": 0, "keys": 0,
-               "tunnels": sum(len(h.get("tunnels", [])) for h in hosts),
-               "snippets": 0, "trusted_keys": 0}
+    pw = simpledialog.askstring("Restore", "Password for this backup:", show="•", parent=app.root)
+    if not pw:
+        return None
     try:
-        summary["snippets"] = len(json.loads(members["snippets.json"])) if "snippets.json" in members else 0
-    except ValueError:
-        pass
-    if "known_hosts" in members:
-        summary["trusted_keys"] = sum(1 for ln in members["known_hosts"].decode("utf-8", "replace").splitlines()
-                                      if ln.strip() and not ln.lstrip().startswith("#"))
-    if passphrase:
-        secrets = _collect_secrets(hosts, include_keys)
-        summary["passwords"] = sum(len(v) for v in secrets["passwords"].values())
-        summary["keys"] = len(secrets["keys"])
-        salt = os.urandom(16)
-        manifest["secrets"] = True
-        manifest["salt"] = base64.b64encode(salt).decode("ascii")
-        members["secrets.enc"] = _fernet(passphrase, salt).encrypt(json.dumps(secrets).encode("utf-8"))
-    members["manifest.json"] = json.dumps(manifest, indent=2).encode("utf-8")
-    tmp = path + ".tmp"
+        bundle = decrypt(blob, pw)
+    except BackupError as e:
+        messagebox.showerror("Restore", str(e), parent=app.root)
+        return None
+    n = len(bundle["hosts"])
+    ans = messagebox.askyesnocancel(
+        "Restore", f"This backup (made {bundle.get('created', '?')}) holds {n} server(s).\n\n"
+                   "Yes = add what is missing AND overwrite servers that match (same id, or same name and address).\n"
+                   "No = only add what is missing and leave everything already here alone.\n"
+                   "Cancel = do nothing.", icon="question", parent=app.root)
+    if ans is None:
+        return None
     try:
-        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-            for name in ("manifest.json",) + tuple(n for n in KNOWN_MEMBERS if n in members and n != "manifest.json"):
-                z.writestr(name, members[name])
-        os.replace(tmp, path)
-    except Exception:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
-    log.info("Exported %d server(s) to %s (passwords: %d, keys: %d)", summary["servers"], path,
-             summary["passwords"], summary["keys"])
-    return summary
-
-
-# ─── import ──────────────────────────────────────────────────────────────────
-
-class Pack:
-    """An opened pack: manifest + the plain parts. Secrets stay encrypted until decrypt() is called."""
-    def __init__(self, manifest, parts):
-        self.manifest, self.parts = manifest, parts
-
-    @property
-    def has_secrets(self):
-        return bool(self.manifest.get("secrets")) and "secrets.enc" in self.parts
-
-    def describe(self):
-        m = self.manifest
-        try:
-            n_hosts = len(json.loads(self.parts["hosts.json"])["hosts"])
-        except (KeyError, ValueError, TypeError):
-            n_hosts = m.get("servers", 0)
-        return (f"{n_hosts} server(s) from {m.get('from_pc', '?')} (RC {m.get('app_version', '?')}), "
-                f"saved {m.get('created', '?')}" + ("; includes passwords and keys" if self.has_secrets else ""))
-
-    def decrypt(self, passphrase):
-        if not self.has_secrets:
-            return {"passwords": {}, "keys": {}}
-        try:
-            salt = base64.b64decode(self.manifest["salt"])
-            raw = _fernet(passphrase, salt).decrypt(self.parts["secrets.enc"])
-            data = json.loads(raw.decode("utf-8"))
-        except Exception as e:  # InvalidToken, bad base64, bad JSON
-            raise PackError("That passphrase did not open the pack (or the pack is damaged).") from e
-        data.setdefault("passwords", {})
-        data.setdefault("keys", {})
-        return data
-
-
-def open_pack(path):
-    """Read a pack WITHOUT touching anything. Only the known member names are read, never extracted by name."""
-    try:
-        with zipfile.ZipFile(path) as z:
-            names = set(z.namelist())
-            if "manifest.json" not in names or "hosts.json" not in names:
-                raise PackError("That file is not an RC export (no manifest).")
-            parts = {}
-            for name in KNOWN_MEMBERS:
-                if name in names:
-                    info = z.getinfo(name)
-                    if info.file_size > MAX_MEMBER:
-                        raise PackError(f"{name} inside the pack is too large to be genuine.")
-                    parts[name] = z.read(name)
-        manifest = json.loads(parts["manifest.json"].decode("utf-8"))
-        if not isinstance(manifest, dict) or manifest.get("app") != "REGTeches RC":
-            raise PackError("That file is not an RC export.")
-        if int(manifest.get("format", 0)) > PACK_FORMAT:
-            raise PackError("This pack was made by a newer RC. Update RC on this PC, then import again.")
-        json.loads(parts["hosts.json"].decode("utf-8"))
-    except PackError:
-        raise
-    except (OSError, zipfile.BadZipFile, ValueError, KeyError) as e:
-        raise PackError(f"Could not read that file: {e}") from e
-    return Pack(manifest, parts)
-
-
-def backup_current(stamp=None):
-    """Copy this RC's data files to <data folder>/backups/before-import-<time>/ and return that folder."""
-    folder = os.path.join(core.APP_DIR, "backups", "before-import-" + (stamp or time.strftime("%Y%m%d-%H%M%S")))
-    os.makedirs(folder, exist_ok=True)
-    for src in (core.HOSTS_FILE, core.SNIPPETS_FILE, core.SETTINGS_FILE, core.KNOWN_HOSTS,
-                os.path.join(core.APP_DIR, "terminal.json")):
-        if os.path.isfile(src):
-            shutil.copy2(src, os.path.join(folder, os.path.basename(src)))
-    return folder
-
-
-def _same_server(a, b):
-    return a.get("id") == b.get("id") or (a["address"].lower() == b["address"].lower()
-                                          and a.get("name", "").lower() == b.get("name", "").lower())
-
-
-def _unique_path(path):
-    base, ext = os.path.splitext(path)
-    n, cand = 1, path
-    while os.path.exists(cand):
-        n += 1
-        cand = f"{base}-{n}{ext}"
-    return cand
-
-
-def _restore_keys(keys, ssh_dir):
-    """Write exported private keys into ssh_dir without ever overwriting an existing file. {name: new path}"""
-    out = {}
-    for name, b64 in keys.items():
-        data = base64.b64decode(b64)
-        target = os.path.join(ssh_dir, _key_name(name))
-        if os.path.isfile(target) and _read_file(target) == data:
-            out[name] = target  # already here, identical
-            continue
-        target = _unique_path(target)
-        os.makedirs(ssh_dir, exist_ok=True)
-        with open(target, "wb") as f:
-            f.write(data)
-        out[name] = target
-    return out
-
-
-def import_pack(pack, hosts, mode="merge", passphrase="", parts=("servers", "snippets", "settings", "known_hosts"),
-                ssh_dir=None):
-    """Bring a pack into this RC. `hosts` is the live server list; the NEW list is returned (the caller saves it)
-    with a report dict. mode: 'merge' (add new, update matching servers, keep everything else) or 'replace'.
-    parts: any of servers, snippets, settings, known_hosts. Secrets are restored when the pack has them and
-    `passphrase` opens it. Nothing is written until the pack and passphrase have been verified."""
-    secrets = pack.decrypt(passphrase) if (pack.has_secrets and passphrase) else {"passwords": {}, "keys": {}}
-    report = {"added": 0, "updated": 0, "unchanged": 0, "passwords": 0, "keys": 0, "snippets": 0,
-              "known_hosts": 0, "settings": False, "backup": "", "skipped": []}
-    report["backup"] = backup_current()
-    new_hosts = list(hosts)
-    if "servers" in parts:
-        incoming, problems = [], []
-        for h in json.loads(pack.parts["hosts.json"].decode("utf-8")).get("hosts", []):
-            if isinstance(h, dict) and isinstance(h.get("address"), str) and h["address"].strip():
-                incoming.append(core.sanitize_host(h, problems))
-            else:
-                report["skipped"].append("an entry with no address")
-        key_paths = _restore_keys(secrets["keys"], ssh_dir or os.path.join(os.path.expanduser("~"), ".ssh")) \
-            if secrets["keys"] else {}
-        report["keys"] = len(key_paths)
-        for h in incoming:
-            sec = secrets["passwords"].get(h["id"], {})
-            if sec.get("password"):
-                h["password_enc"] = core.protect_password(sec["password"])
-                report["passwords"] += 1
-            if sec.get("rustdesk"):
-                h["rustdesk_password_enc"] = core.protect_password(sec["rustdesk"])
-                report["passwords"] += 1
-            for idx, pw in (sec.get("extra") or {}).items():
-                try:
-                    h["connections"][int(idx)]["password_enc"] = core.protect_password(pw)
-                    report["passwords"] += 1
-                except (IndexError, ValueError, KeyError):
-                    pass
-            kf = h.get("key_file") or ""
-            if kf and _key_name(kf) in key_paths:
-                h["key_file"] = key_paths[_key_name(kf)]  # the key now lives in THIS PC's .ssh folder
-            elif kf and not os.path.isfile(kf):
-                h["key_file"] = ""  # a path from the other PC that does not exist here
-        if mode == "replace":
-            report["updated"] = len(incoming)
-            new_hosts = incoming
-        else:
-            for h in incoming:
-                match = next((i for i, o in enumerate(new_hosts) if _same_server(o, h)), None)
-                if match is None:
-                    new_hosts.append(h)
-                    report["added"] += 1
-                else:
-                    old = new_hosts[match]
-                    for f in SECRET_FIELDS:   # never lose a password this PC already has
-                        if not h.get(f) and old.get(f):
-                            h[f] = old[f]
-                    h["id"] = old.get("id", h["id"])
-                    if old == h:
-                        report["unchanged"] += 1
-                    else:
-                        new_hosts[match] = h
-                        report["updated"] += 1
-    if "snippets" in parts and "snippets.json" in pack.parts:
-        try:
-            snips = [s for s in json.loads(pack.parts["snippets.json"].decode("utf-8"))
-                     if isinstance(s, dict) and s.get("name") and s.get("command")]
-            if mode == "merge":
-                have = {s.get("id") or s["name"] for s in core.load_snippets()}
-                current = core.load_snippets()
-                snips = current + [s for s in snips if (s.get("id") or s["name"]) not in have]
-            core.save_snippets(snips)
-            report["snippets"] = len(snips)
-        except (ValueError, TypeError, OSError) as e:
-            report["skipped"].append(f"snippets ({e})")
-    if "settings" in parts:
-        for name, dest in (("settings.json", core.SETTINGS_FILE),
-                           ("terminal.json", os.path.join(core.APP_DIR, "terminal.json"))):
-            if name in pack.parts:
-                try:
-                    json.loads(pack.parts[name].decode("utf-8"))
-                    with open(dest, "wb") as f:
-                        f.write(pack.parts[name])
-                    report["settings"] = True
-                except (ValueError, OSError) as e:
-                    report["skipped"].append(f"{name} ({e})")
-    if "known_hosts" in parts and "known_hosts" in pack.parts:
-        try:
-            incoming_lines = [ln for ln in pack.parts["known_hosts"].decode("utf-8", "replace").splitlines() if ln.strip()]
-            with core.KNOWN_HOSTS_LOCK:
-                have = []
-                if mode == "merge" and os.path.isfile(core.KNOWN_HOSTS):
-                    with open(core.KNOWN_HOSTS, "r", encoding="utf-8", errors="replace") as f:
-                        have = [ln.rstrip("\n") for ln in f if ln.strip()]
-                merged = have + [ln for ln in incoming_lines if ln not in set(have)]
-                with open(core.KNOWN_HOSTS, "w", encoding="utf-8", newline="\n") as f:
-                    f.write("\n".join(merged) + ("\n" if merged else ""))
-            report["known_hosts"] = len(merged)
-        except OSError as e:
-            report["skipped"].append(f"known_hosts ({e})")
-    log.info("Imported pack: %s", {k: v for k, v in report.items() if k != "skipped"})
-    return new_hosts, report
+        keep = os.path.join(core.APP_DIR, "hosts.json.before-restore-" + time.strftime("%Y%m%d-%H%M%S"))
+        if os.path.exists(core.HOSTS_FILE):
+            import shutil
+            shutil.copy2(core.HOSTS_FILE, keep)      # a safety copy of the list as it was
+        new_hosts, report = apply_bundle(bundle, app.hosts, replace=bool(ans))
+        app.hosts[:] = new_hosts
+        app.commit()
+    except (OSError, ValueError) as e:
+        messagebox.showerror("Restore", f"The restore failed part-way:\n{e}", parent=app.root)
+        return None
+    messagebox.showinfo("Restore", "Restored.\n\n" + describe(report) + "\n\nThe server list as it was before is saved as\n" + os.path.basename(keep), parent=app.root)
+    app.status.set("Backup restored")
+    log.info("Backup restored: %s", report)
+    return report

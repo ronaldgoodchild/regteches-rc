@@ -26,12 +26,47 @@ import pyte
 from pyte import screens as _pscreens
 
 import rc_manager as core
+import rc_quick
+import rc_zmodem
 
 log = core.log
 
 PALETTE = ["#1e1e1e", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#d7dae0",
            "#5c6370", "#ff7b86", "#b5e890", "#ffd88a", "#7cc4ff", "#e08cf5", "#6fd6e0", "#ffffff"]
 DEFAULT_FG, DEFAULT_BG = PALETTE[7], PALETTE[0]
+
+def _scheme(bg, fg, cursor, sel, bold, ansi):
+    return {"bg": bg, "fg": fg, "cursor": cursor, "sel": sel, "bold": bold, "ansi": ansi.split()}
+
+
+# Terminal colour schemes: background, text, cursor, selection, bold-default text and the 16 ANSI colours
+# (black red green yellow blue magenta cyan white, then the bright versions).
+SCHEMES = {
+    "Dark": _scheme("#1e1e1e", "#d7dae0", "#c8ccd4", "#3e4451", "#ffffff", " ".join(PALETTE)),
+    "Light": _scheme("#fafafa", "#383a42", "#526fff", "#cfd8f6", "#000000",
+                     "#383a42 #e45649 #50a14f #c18401 #4078f2 #a626a4 #0184bc #a0a1a7 "
+                     "#4f525e #e06c75 #60b35f #d19a1a #5a8df5 #c678dd #1aa3d6 #6b6e78"),
+    "Solarized Dark": _scheme("#002b36", "#839496", "#93a1a1", "#073642", "#93a1a1",
+                              "#073642 #dc322f #859900 #b58900 #268bd2 #d33682 #2aa198 #eee8d5 "
+                              "#586e75 #cb4b16 #93a100 #cfa000 #4ea5e8 #6c71c4 #3cc4b9 #fdf6e3"),
+    "Dracula": _scheme("#282a36", "#f8f8f2", "#f8f8f2", "#44475a", "#ffffff",
+                       "#21222c #ff5555 #50fa7b #f1fa8c #bd93f9 #ff79c6 #8be9fd #f8f8f2 "
+                       "#6272a4 #ff6e6e #69ff94 #ffffa5 #d6acff #ff92df #a4ffff #ffffff"),
+    "Monokai": _scheme("#272822", "#f8f8f2", "#f8f8f0", "#49483e", "#ffffff",
+                       "#272822 #f92672 #a6e22e #f4bf75 #66d9ef #ae81ff #a1efe4 #f8f8f2 "
+                       "#75715e #ff4d8d #bdf24a #ffd08c #8ae6ff #c4a3ff #c0fff2 #f9f8f5"),
+    "Nord": _scheme("#2e3440", "#d8dee9", "#d8dee9", "#434c5e", "#eceff4",
+                    "#3b4252 #bf616a #a3be8c #ebcb8b #81a1c1 #b48ead #88c0d0 #e5e9f0 "
+                    "#4c566a #d57780 #b5d19c #f5d99a #94b3d3 #c79fc0 #8fbcbb #eceff4"),
+    "Gruvbox Dark": _scheme("#282828", "#ebdbb2", "#ebdbb2", "#504945", "#fbf1c7",
+                            "#282828 #cc241d #98971a #d79921 #458588 #b16286 #689d6a #a89984 "
+                            "#928374 #fb4934 #b8bb26 #fabd2f #83a598 #d3869b #8ec07c #ebdbb2"),
+    "Green on black": _scheme("#000000", "#33ff33", "#33ff33", "#14501a", "#ccffcc",
+                              "#000000 #cc3333 #33cc33 #cccc33 #3333cc #cc33cc #33cccc #33ff33 "
+                              "#555555 #ff5555 #55ff55 #ffff55 #6666ff #ff55ff #55ffff #ccffcc"),
+}
+DEFAULT_SCHEME = "Dark"
+FONT_DEFAULT_FAMILY = "Consolas"
 _NAMES = ["black", "red", "green", "brown", "blue", "magenta", "cyan", "white"]
 COLOR_INDEX = {n: i for i, n in enumerate(_NAMES)}
 COLOR_INDEX.update({"bright" + n: i + 8 for i, n in enumerate(_NAMES)})
@@ -57,7 +92,7 @@ def prefs_path():
 
 
 def clean_prefs(data):
-    """Force font size and scrollback into sane ranges, whatever the file held."""
+    """Force every setting into a sane value, whatever the file held."""
     data = data if isinstance(data, dict) else {}
     try:
         size = int(data.get("font_size", FONT_DEFAULT))
@@ -67,7 +102,13 @@ def clean_prefs(data):
         sb = int(data.get("scrollback", SCROLLBACK_CHOICES[1]))
     except (TypeError, ValueError):
         sb = SCROLLBACK_CHOICES[1]
-    return {"font_size": max(FONT_MIN, min(FONT_MAX, size)), "scrollback": max(500, min(200000, sb))}
+    scheme = data.get("scheme") if data.get("scheme") in SCHEMES else DEFAULT_SCHEME
+    font = data.get("font") if isinstance(data.get("font"), str) and data.get("font").strip() else FONT_DEFAULT_FAMILY
+    flag = lambda key, default: data.get(key) if isinstance(data.get(key), bool) else default
+    return {"font_size": max(FONT_MIN, min(FONT_MAX, size)), "scrollback": max(500, min(200000, sb)),
+            "scheme": scheme, "font": font.strip(), "copy_on_select": flag("copy_on_select", False),
+            "right_click_paste": flag("right_click_paste", False), "middle_click_paste": flag("middle_click_paste", True),
+            "zmodem": flag("zmodem", True), "zmodem_dir": data.get("zmodem_dir") if isinstance(data.get("zmodem_dir"), str) else ""}
 
 
 def load_prefs():
@@ -205,8 +246,9 @@ def line_runs(line, cols, min_len=0):
     return [("".join(chars), style) for chars, style in runs]
 
 
-def style_colors(style):
+def style_colors(style, scheme=None):
     """(foreground, background) hex colours for a style tuple, or None where the widget default applies."""
+    scheme = scheme or SCHEMES[DEFAULT_SCHEME]
     fg, bg, bold, _u, _s, reverse = style
 
     def conv(name, is_fg):
@@ -216,15 +258,15 @@ def style_colors(style):
             i = COLOR_INDEX[name]
             if is_fg and bold and i < 8:
                 i += 8  # bold ANSI colours are drawn bright, like most terminals
-            return PALETTE[i]
+            return scheme["ansi"][i]
         if re.fullmatch(r"[0-9a-fA-F]{6}", name):
             return "#" + name.lower()
         return None
     f, b = conv(fg, True), conv(bg, False)
     if bold and f is None:
-        f = PALETTE[15]
+        f = scheme["bold"]
     if reverse:
-        f, b = (b or DEFAULT_BG), (f or DEFAULT_FG)
+        f, b = (b or scheme["bg"]), (f or scheme["fg"])
     return f, b
 
 
@@ -233,25 +275,36 @@ def style_colors(style):
 class TerminalTab(ttk.Frame):
     AUTO_CONNECT = True  # tests switch this off
 
-    def __init__(self, app, host, user, password):
-        super().__init__(app.nb)
+    def __init__(self, app, host, user, password, parent=None, playback=False):
+        super().__init__(parent if parent is not None else app.nb)
+        self.playback = playback          # True: a viewer for a recording (no connection, no toolbar)
+        self.fixed_size = None            # (cols, rows) a recording forces on the screen
+        self.recorder = None
         self.app, self.host, self.creds = app, host, (user, password)
         self.client = self.chan = None
         self.closed = False
         self.ever_connected = False
         self.attempt = 0
         self.reconnect_job = self.render_job = self.resize_job = None
+        self.kind = host.get("_kind", "ssh")      # "ssh", "telnet" or "serial"
+        self.panel, self.expect = None, None
+        self.history = rc_quick.HistoryRecorder(self.cursor_line, lambda: self.screen.alt)
         self.generation = 0  # bumps on every (re)connect so a stale reader thread can't touch the new session
         self.decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self.prefs = load_prefs()
-        self.font = tkfont.Font(family="Consolas", size=self.prefs["font_size"])
+        self.scheme = SCHEMES[self.prefs["scheme"]]
+        family = self.prefs["font"]
+        if family not in tkfont.families(self):
+            family = FONT_DEFAULT_FAMILY if FONT_DEFAULT_FAMILY in tkfont.families(self) else "Courier New"
+        self.font = tkfont.Font(family=family, size=self.prefs["font_size"])
         self.sb_limit = self.prefs["scrollback"]
         self.sb = 0  # scrollback lines held at the top of the Text widget
         self.styles = {}
         self.log_file = None
 
         bar = ttk.Frame(self)
-        bar.pack(side="top", fill="x")
+        if not playback:
+            bar.pack(side="top", fill="x")
         self.snip_btn = ttk.Menubutton(bar, text="▤ Snippets ▾")
         self.snip_btn.pack(side="left", padx=4, pady=2)
         self.snip_btn.configure(menu=tk.Menu(self.snip_btn, tearoff=0, postcommand=self.fill_snippet_menu))
@@ -264,6 +317,13 @@ class TerminalTab(ttk.Frame):
         ttk.Button(bar, text="▼", width=3, command=self.find_next).pack(side="left")
         self.log_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="Log to file", variable=self.log_var, command=self.toggle_log).pack(side="left", padx=8)
+        self.zm_cancel_btn = ttk.Button(bar, text="✕ Cancel Zmodem", command=self.zmodem_cancel)      # shown only during a transfer
+        self.zm_cancel = threading.Event()
+        self.rec_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="⏺ Record", variable=self.rec_var, command=self.toggle_record).pack(side="left", padx=2)
+        self.bcast_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="📡 Broadcast", variable=self.bcast_var, command=self.bcast_changed).pack(side="left", padx=4)
+        ttk.Button(bar, text="⚡ Quick", command=self.toggle_panel).pack(side="left", padx=2)
         ttk.Button(bar, text="A−", width=3, command=lambda: self.change_font(-1)).pack(side="left")
         ttk.Button(bar, text="A+", width=3, command=lambda: self.change_font(+1)).pack(side="left", padx=(2, 0))
         self.status_var = tk.StringVar(value="Connecting ...")
@@ -271,19 +331,21 @@ class TerminalTab(ttk.Frame):
         self.reconnect_btn = ttk.Button(bar, text="⟳ Reconnect", command=self.reconnect_now, state="disabled")
         self.reconnect_btn.pack(side="right", padx=2)
 
-        self.t = tk.Text(self, bg=DEFAULT_BG, fg=DEFAULT_FG, insertbackground="#ffffff", insertwidth=2,
+        self.t = tk.Text(self, bg=self.scheme["bg"], fg=self.scheme["fg"], insertbackground=self.scheme["cursor"], insertwidth=2,
                          font=self.font, wrap="none", undo=False, borderwidth=0, padx=4, pady=2,
-                         selectbackground="#3e4451", exportselection=False, cursor="xterm")
+                         selectbackground=self.scheme["sel"], exportselection=False, cursor="xterm")
         self.t._rc_fixed = True  # the terminal keeps its own colours in every theme
-        sb = ttk.Scrollbar(self, command=self.t.yview)
+        sb = self.sbar = ttk.Scrollbar(self, command=self.t.yview)
         self.t.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.t.pack(side="left", fill="both", expand=True)
-        self.t.tag_configure("tcursor", background="#c8ccd4", foreground="#1e1e1e")
+        self.t.tag_configure("tcursor", background=self.scheme["cursor"], foreground=self.scheme["bg"])
         self.t.tag_configure("found", background="#e5c07b", foreground="#000000")
         self.t.bind("<Key>", self.on_key)
         self.t.bind("<Button-1>", lambda e: self.after_idle(self.t.focus_set))
         self.t.bind("<Button-3>", self.popup)
+        self.t.bind("<Button-2>", self.middle_click)
+        self.t.bind("<ButtonRelease-1>", self.select_release, add="+")
         self.t.bind("<Control-MouseWheel>", self.on_zoom)
         self.t.bind("<Configure>", lambda e: self.schedule_resize())
 
@@ -300,14 +362,33 @@ class TerminalTab(ttk.Frame):
         for n in SCROLLBACK_CHOICES:
             sbm.add_radiobutton(label=f"{n:,} lines", variable=self.sb_var, value=n, command=lambda n=n: self.set_scrollback(n))
         self.menu.add_cascade(label="Scrollback", menu=sbm)
+        self.menu.add_separator()
+        sch = tk.Menu(self.menu, tearoff=0)
+        self.scheme_var = tk.StringVar(value=self.prefs["scheme"])
+        for name in SCHEMES:
+            sch.add_radiobutton(label=name, variable=self.scheme_var, value=name, command=lambda n=name: self.choose_scheme(n))
+        self.menu.add_cascade(label="Colours", menu=sch)
+        self.menu.add_command(label="Font…", command=self.choose_font)
+        self.opt_vars = {}
+        for key, label in (("copy_on_select", "Copy when I select text"), ("right_click_paste", "Right-click pastes (no menu)"),
+                           ("middle_click_paste", "Middle-click pastes"), ("zmodem", "Zmodem file transfers (rz / sz)")):
+            self.opt_vars[key] = tk.BooleanVar(value=self.prefs[key])
+            self.menu.add_checkbutton(label=label, variable=self.opt_vars[key], command=lambda k=key: self.set_option(k))
+        self.menu.add_separator()
+        self.menu.add_command(label="Save output to a file…", command=self.save_output)
+        self.menu.add_command(label="Clear screen (keep scrollback)", command=self.clear_keep_history)
+        self.menu.add_separator()
+        self.menu.add_command(label="⇧ Upload files with Zmodem (runs rz -be)…", command=self.zmodem_upload)
+        self.menu.add_command(label="Folder for files received with Zmodem…", command=self.zmodem_pick_dir)
 
         self.update_idletasks()
         self.cols, self.rows = self.size()
         self.screen = RcScreen(self.cols, self.rows, on_input=self.send, on_bell=self.t.bell)
         self.stream = pyte.Stream(self.screen, strict=False)
         self.t.insert("1.0", "\n" * (self.rows - 1))
-        self.write_local(f"Connecting to {host['address']} ...\r\n")
-        if self.AUTO_CONNECT:
+        if not playback:
+            self.write_local(f"Connecting to {host['address']} ...\r\n")
+        if self.AUTO_CONNECT and not playback:
             self.start_connect()
 
     # ── connecting, dropping, reconnecting ──
@@ -325,16 +406,25 @@ class TerminalTab(ttk.Frame):
 
     def connect(self, gen, user, password, cols, rows):
         import paramiko
+        kind = self.kind
         try:
-            client = core.open_ssh_client(self.app, self.host, user, password)
-            tr = client.get_transport()
-            if tr:
-                tr.set_keepalive(30)  # notices a dead link instead of freezing silently
-            chan = client.invoke_shell(term="xterm-256color", width=self.cols, height=self.rows)  # latest size: the tab has been laid out by now
+            if kind == "telnet":
+                import rc_transport
+                client, chan = None, rc_transport.open_telnet(self.host, self.cols, self.rows)
+            elif kind == "serial":
+                import rc_transport
+                client, chan = None, rc_transport.open_serial(self.host.get("serial_spec"), self.host.get("serial_baud") or 0)
+            else:
+                client = core.open_ssh_client(self.app, self.host, user, password)
+                tr = client.get_transport()
+                if tr:
+                    tr.set_keepalive(30)  # notices a dead link instead of freezing silently
+                chan = client.invoke_shell(term="xterm-256color", width=self.cols, height=self.rows)  # latest size: the tab has been laid out by now
         except Exception as e:
             msg = str(e) or e.__class__.__name__
-            fatal = isinstance(e, (paramiko.AuthenticationException, paramiko.BadHostKeyException)) or "not trusted" in msg
-            log.warning("SSH tab: connection to %s failed: %s", self.host["address"], msg)
+            fatal = (kind == "serial" or isinstance(e, (paramiko.AuthenticationException, paramiko.BadHostKeyException))
+                     or "not trusted" in msg)          # a busy or missing COM port will not fix itself by retrying
+            log.warning("%s tab: connection to %s failed: %s", kind.capitalize(), self.host["address"], msg)
             self.app.post(lambda: self.connect_failed(gen, msg, fatal))
             return
         if self.closed or gen != self.generation:
@@ -345,8 +435,9 @@ class TerminalTab(ttk.Frame):
                     pass
             return
         self.client, self.chan = client, chan
-        log.info("SSH tab: connected to %s", self.host["address"])
+        log.info("%s tab: connected to %s", kind.capitalize(), self.host["address"])
         self.app.post(lambda: self.connected(gen))
+        zdetect = rc_zmodem.Detector() if kind == "ssh" else None     # rz / sz work over SSH only (Telnet and Serial are not 8-bit clean here)
         while not self.closed and gen == self.generation:
             try:
                 data = chan.recv(8192)
@@ -354,15 +445,24 @@ class TerminalTab(ttk.Frame):
                 break
             if not data:
                 break
-            text = self.decoder.decode(data)
-            self.app.post(lambda t=text, g=gen: g == self.generation and self.feed(t))
+            zstart = None
+            if zdetect is not None and self.prefs.get("zmodem", True):
+                data, zstart = zdetect.feed(data)
+            if data:
+                text = self.decoder.decode(data)
+                self.app.post(lambda t=text, g=gen: g == self.generation and self.remote_data(t))
+            if zstart is not None:
+                self.run_zmodem(chan, zstart)
         clean = False
         try:
-            tr = client.get_transport()
-            clean = bool(chan.exit_status_ready() and tr is not None and tr.is_active())
+            if client is None:                  # telnet / serial: the channel itself knows (server hung up = log-out)
+                clean = bool(chan.exit_status_ready())
+            else:
+                tr = client.get_transport()
+                clean = bool(chan.exit_status_ready() and tr is not None and tr.is_active())
         except Exception:
             pass
-        log.info("SSH tab: connection to %s ended (%s)", self.host["address"], "shell exited" if clean else "dropped")
+        log.info("%s tab: connection to %s ended (%s)", kind.capitalize(), self.host["address"], "shell exited" if clean else "dropped")
         if not self.closed and gen == self.generation:
             self.app.post(lambda: self.session_ended(gen, clean))
 
@@ -378,6 +478,7 @@ class TerminalTab(ttk.Frame):
         self.apply_size()
         self.resize_pty()
         self.t.focus_set()
+        self.start_login_script()
 
     def connect_failed(self, gen, msg, fatal):
         if self.closed or gen != self.generation:
@@ -434,6 +535,11 @@ class TerminalTab(ttk.Frame):
 
     def close(self):
         self.closed = True
+        if self.expect:
+            self.expect.stop()
+        if self.recorder:
+            self.recorder.close()
+            self.recorder = None
         for job in (self.reconnect_job, self.render_job, self.resize_job):
             if job:
                 try:
@@ -447,6 +553,8 @@ class TerminalTab(ttk.Frame):
 
     # ── size ──
     def size(self):
+        if self.fixed_size:
+            return self.fixed_size
         w, h = max(self.t.winfo_width(), 400), max(self.t.winfo_height(), 200)
         return (max(20, (w - 8) // max(self.font.measure("0"), 1)),
                 max(5, (h - 4) // max(self.font.metrics("linespace"), 1)))
@@ -467,6 +575,8 @@ class TerminalTab(ttk.Frame):
         self.screen.resize(rows, cols)
         self.rebuild_screen_region()
         self.resize_pty()
+        if self.recorder:
+            self.recorder.resize(cols, rows)
         self.schedule_render()
 
     def rebuild_screen_region(self):
@@ -510,8 +620,16 @@ class TerminalTab(ttk.Frame):
         menu = self.snip_btn.nametowidget(m) if isinstance(m, str) else m
         menu.delete(0, "end")
         snips = core.load_snippets()
+        groups = {}
         for s in snips:
+            groups.setdefault((s.get("group") or "").strip(), []).append(s)
+        for s in groups.pop("", []):
             menu.add_command(label=s["name"], command=lambda s=s: self.run_snippet(s))
+        for g in sorted(groups, key=str.lower):
+            sub = tk.Menu(menu, tearoff=0)
+            for s in groups[g]:
+                sub.add_command(label=s["name"], command=lambda s=s: self.run_snippet(s))
+            menu.add_cascade(label=g, menu=sub)
         if not snips:
             menu.add_command(label="(no snippets - Tools > Snippets)", state="disabled")
 
@@ -519,7 +637,7 @@ class TerminalTab(ttk.Frame):
         if s.get("confirm", True) and not messagebox.askyesno("Snippet", f"Type this into the terminal?\n\n{s['command']}",
                                                               parent=self):
             return
-        self.send(s["command"].replace("\r\n", "\n").replace("\n", "\r") + "\r")
+        self.send_user(s["command"].replace("\r\n", "\n").replace("\n", "\r") + "\r")
         self.t.focus_set()
 
     def find_dialog(self):
@@ -562,10 +680,208 @@ class TerminalTab(ttk.Frame):
             except Exception as e:
                 log.debug("SSH tab: send failed: %s", e)
 
+    def terminals(self):
+        return [self]
+
+    # quick commands panel, history, login script
+    def toggle_panel(self):
+        if self.panel is not None and self.panel.winfo_manager():
+            self.panel.pack_forget()
+            self.t.focus_set()
+            return
+        if self.panel is None:
+            self.panel = rc_quick.QuickPanel(self, self)
+            theme = getattr(self.app, "theme", None)
+            if theme:
+                theme.paint(self.panel)
+        self.panel.pack(side="right", fill="y", before=self.sbar)
+        self.panel.refresh()
+
+    def cursor_line(self):
+        """The screen line the cursor is on, up to the cursor (used to spot a Password: prompt)."""
+        try:
+            c = self.screen.cursor
+            return self.screen.display[c.y][:c.x]
+        except Exception:
+            return ""
+
+    # ── Zmodem (rz / sz) ──
+    def zmodem_cancel(self):
+        self.zm_cancel.set()
+
+    def zmodem_pick_dir(self, ask=True):
+        """The folder received files go in: remembered, asked for the first time (or when `ask`)."""
+        from tkinter import filedialog
+        current = self.prefs.get("zmodem_dir", "")
+        if current and os.path.isdir(current) and not ask:
+            return current
+        start = current if os.path.isdir(current or "") else os.path.join(os.path.expanduser("~"), "Downloads")
+        folder = filedialog.askdirectory(parent=self, title="Save files received with Zmodem in ...", initialdir=start)
+        if folder:
+            self.set_pref(zmodem_dir=folder)
+        return folder or ""
+
+    def zmodem_upload(self):
+        """Right-click > Upload files with Zmodem: type `rz -be` and let the server's rz start the transfer."""
+        if self.kind != "ssh" or not self.chan:
+            messagebox.showinfo("Zmodem", "Zmodem works in a connected SSH terminal.", parent=self)
+            return
+        self.send("rz -be\r")
+
+    def run_zmodem(self, chan, first):
+        """Called from the reader thread when the server starts Zmodem (`sz` = it sends, `rz` = it waits): this thread
+        takes over the connection until the transfer ends, then the terminal carries on."""
+        import socket as _socket
+        sending = first.startswith(b"**\x18B01")           # ZRINIT: the server (rz) is waiting for files
+        pending = bytearray(first)
+        app, post = self.app, self.app.post
+
+        def read(n, timeout):
+            if pending:
+                d = bytes(pending)
+                pending.clear()
+                return d
+            chan.settimeout(timeout)
+            try:
+                return chan.recv(n)
+            except _socket.timeout:
+                return None
+
+        def say(msg):
+            post(lambda: self.write_local(f"\r\n\x1b[36m[{msg}]\x1b[0m\r\n"))
+        self.zm_cancel.clear()
+        post(lambda: self.zm_cancel_btn.pack(side="left", padx=4))
+        ui = _ZmodemUi(self)
+        try:
+            if sending:
+                files = core.ui_call(app, self.zmodem_choose_files)
+                if not files:
+                    chan.sendall(rc_zmodem.abort_bytes())
+                    say("Zmodem: upload cancelled")
+                    return
+                post(lambda: app.status.set(f"Zmodem: sending {len(files)} file(s) ..."))
+                results = rc_zmodem.Sender(read, chan.sendall, ui, log.debug).send(files)
+                sent = [r for r in results if r[2] == "sent"]
+                say(f"Zmodem: sent {len(sent)} file(s): " + ", ".join(f"{n} ({core.fmt_size(sz)})" for n, sz, _ in sent)
+                    + (f"; {len(results) - len(sent)} skipped by the server" if len(sent) != len(results) else ""))
+            else:
+                folder = core.ui_call(app, lambda: self.zmodem_pick_dir(ask=False))
+                if not folder:
+                    chan.sendall(rc_zmodem.abort_bytes())
+                    say("Zmodem: download cancelled (no folder chosen)")
+                    return
+                ui.folder = folder
+                post(lambda: app.status.set("Zmodem: receiving ..."))
+                saved = rc_zmodem.Receiver(read, chan.sendall, ui, log.debug).receive()
+                say("Zmodem: received " + (", ".join(f"{n} ({core.fmt_size(sz)})" for n, sz, _ in saved) or "nothing") + f" in {folder}")
+        except rc_zmodem.ZCancelled as e:
+            say(f"Zmodem stopped: {e}")
+        except (rc_zmodem.ZError, OSError) as e:
+            say(f"Zmodem failed: {e}")
+        except Exception as e:
+            log.exception("Zmodem transfer crashed")
+            say(f"Zmodem failed: {e}")
+        finally:
+            try:
+                chan.settimeout(None)
+            except Exception:
+                pass
+            post(lambda: (self.zm_cancel_btn.pack_forget(), app.status.set("")))
+
+    def zmodem_choose_files(self):
+        from tkinter import filedialog
+        files = filedialog.askopenfilenames(parent=self, title="Choose the files to send with Zmodem")
+        return list(files)
+
+    def clear_keep_history(self):
+        """Clear the screen but scroll what was on it into the scrollback (nothing is lost, unlike Clear screen and scrollback)."""
+        self.feed("\r\n" * self.rows)
+        self.send("\x0c")
+
+    def clear_for_playback(self):
+        """Empty the screen and scrollback (the recording player replays from a point)."""
+        self.clear()
+
+    def toggle_record(self):
+        """⏺ Record: save what the server sends (with timing) as an asciicast file you can replay (Tools > Play a recording)."""
+        import rc_record
+        if self.rec_var.get():
+            try:
+                self.recorder = rc_record.Recorder.for_session(self.host.get("name", "session"), self.cols, self.rows,
+                                                               f"{self.kind} {self.host.get('name', '')}")
+            except OSError as e:
+                self.rec_var.set(False)
+                messagebox.showerror("Record", f"Could not start the recording:\n{e}", parent=self)
+                return
+            self.app.status.set(f"⏺ Recording to {self.recorder.path}")
+        elif self.recorder:
+            path = self.recorder.close()
+            self.recorder = None
+            self.app.status.set(f"Recording saved: {path}")
+
+    def remote_data(self, text):
+        if self.recorder:
+            self.recorder.output(text)
+        self.feed(text)
+        if self.expect is not None:
+            self.expect.feed(text)
+
+    def start_login_script(self):
+        if self.expect:
+            self.expect.stop()
+            self.expect = None
+        script = (self.host.get("login_script") or "").strip()
+        if not script:
+            return
+        try:
+            steps = rc_quick.parse_login_script(script)
+        except ValueError as e:
+            self.write_local(f"\r\n\x1b[31m[login script not run: {e}]\x1b[0m\r\n")
+            return
+        if not steps:
+            return
+        user, pw = self.creds
+        note = lambda m: self.write_local(f"\r\n\x1b[36m[{m}]\x1b[0m\r\n")
+        self.expect = rc_quick.ExpectRunner(
+            steps, self.send, self.after, self.after_cancel, note,
+            subst=lambda t: rc_quick.substitute(t, user, self.host.get("address", ""), pw))
+        self.expect.start()
+
+    def bcast_changed(self):
+        ask = getattr(self.app, "confirm_broadcast", None)
+        if self.bcast_var.get() and ask and not ask():
+            self.bcast_var.set(False)
+        fn = getattr(self.app, "broadcast_changed", None)
+        if fn:
+            fn()
+
+    def send_user(self, s, paste_text=None):
+        """Something the user typed, pasted or ran from a snippet: goes to this session and, with Broadcast
+        ticked, to every other terminal that also has Broadcast ticked. (send() alone is used for the
+        terminal's own replies to the server, which must never be copied to other sessions.)"""
+        self.send(s)
+        try:
+            self.history.typed(paste_text if paste_text is not None else s)
+            if self.panel is not None and self.panel.winfo_ismapped() and s == "\r":
+                self.after(200, self.panel.refresh)
+        except Exception:
+            log.debug("history recorder failed", exc_info=True)
+        if not self.bcast_var.get():
+            return
+        peers = getattr(self.app, "broadcast_peers", None)
+        for peer in (peers(self) if peers else []):
+            peer.send(peer.wrap_paste(paste_text) if paste_text is not None else s)
+
+    def wrap_paste(self, text):
+        return "\x1b[200~" + text + "\x1b[201~" if self.screen.bracketed else text
+
     def on_key(self, e):
         ctrl, shift = e.state & 0x4, e.state & 0x1
         alt = e.state & 0x20000
         key = e.keysym
+        handler = getattr(self.app, "handle_shortcut", None)
+        if ctrl and handler and handler(key, True, bool(shift)):
+            return "break"                                  # Ctrl+1..9 / Ctrl+Tab / Ctrl+Shift+D belong to the program, not the server
         if ctrl and key.lower() in ("c", "v") and (shift or key.lower() == "v"):
             self.copy() if key.lower() == "c" else self.paste()
             return "break"
@@ -576,15 +892,89 @@ class TerminalTab(ttk.Frame):
             self.paste()
             return "break"
         if key in CURSOR_KEYS:
-            self.send(("\x1bO" if self.screen.app_cursor else "\x1b[") + CURSOR_KEYS[key])
+            self.send_user(("\x1bO" if self.screen.app_cursor else "\x1b[") + CURSOR_KEYS[key])
         elif key in KEYS:
-            self.send(KEYS[key])
+            self.send_user(KEYS[key])
         elif e.char:
-            self.send(("\x1b" + e.char) if (alt and not ctrl) else e.char)
+            self.send_user(("\x1b" + e.char) if (alt and not ctrl) else e.char)
         return "break"
 
     def popup(self, e):
+        if self.prefs["right_click_paste"]:
+            self.paste()
+            return "break"
         self.menu.tk_popup(e.x_root, e.y_root)
+
+    def middle_click(self, e):
+        if self.prefs["middle_click_paste"]:
+            self.paste()
+        return "break"
+
+    def select_release(self, e):
+        if self.prefs["copy_on_select"] and self.t.tag_ranges("sel"):
+            self.copy()
+
+    # ── colours, font, options, saving the output ──
+    def terminals_to_update(self):
+        fn = getattr(self.app, "all_terminals", None)
+        return fn() if fn else [self]
+
+    def set_pref(self, **kw):
+        prefs = load_prefs()
+        prefs.update(kw)
+        save_prefs(prefs)
+        for t in self.terminals_to_update():
+            t.prefs = load_prefs()
+
+    def choose_scheme(self, name):
+        self.set_pref(scheme=name)
+        for t in self.terminals_to_update():
+            t.apply_scheme(name)
+
+    def apply_scheme(self, name):
+        if name not in SCHEMES:
+            return
+        sc = self.scheme = SCHEMES[name]
+        self.scheme_var.set(name)
+        self.t.configure(bg=sc["bg"], fg=sc["fg"], insertbackground=sc["cursor"], selectbackground=sc["sel"])
+        self.t.tag_configure("tcursor", background=sc["cursor"], foreground=sc["bg"])
+        for style, tag in self.styles.items():              # recolour what is already on screen and in the scrollback
+            fg, bg = style_colors(style, sc)
+            self.t.tag_configure(tag, foreground=fg or sc["fg"], background=bg or sc["bg"])
+        self.t.tag_raise("sel")
+        self.schedule_render()
+
+    def choose_font(self):
+        FontDialog(self)
+
+    def apply_font(self, family):
+        self.font.configure(family=family)
+        self.after_idle(self.apply_size)
+
+    def set_option(self, key):
+        self.set_pref(**{key: bool(self.opt_vars[key].get())})
+
+    def output_text(self):
+        """Everything in the scrollback and on the screen as plain text."""
+        self.render()
+        lines = self.t.get("1.0", "end-1c").split("\n")
+        return "\n".join(l.rstrip() for l in lines).rstrip("\n") + "\n"
+
+    def save_output(self):
+        from tkinter import filedialog
+        name = re.sub(r"[^A-Za-z0-9._-]+", "_", self.host.get("name", "session")) + time.strftime("_%Y%m%d_%H%M%S") + ".txt"
+        path = filedialog.asksaveasfilename(parent=self, title="Save the terminal output", initialfile=name,
+                                            defaultextension=".txt", filetypes=[("Text", "*.txt"), ("All files", "*.*")])
+        if not path:
+            return None
+        try:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(self.output_text())
+        except OSError as e:
+            messagebox.showerror("Save output", f"Could not save:\n{e}", parent=self)
+            return None
+        self.app.status.set(f"Saved the terminal output to {path}")
+        return path
 
     def copy(self):
         if self.t.tag_ranges("sel"):
@@ -593,12 +983,24 @@ class TerminalTab(ttk.Frame):
 
     def paste(self):
         try:
-            text = self.clipboard_get().replace("\r\n", "\r").replace("\n", "\r")
+            self.paste_text(self.clipboard_get())
         except tk.TclError:
             return
-        if self.screen.bracketed:
-            text = "\x1b[200~" + text + "\x1b[201~"
-        self.send(text)
+
+    def paste_text(self, text):
+        """Paste (or quick-command paste) with a check before several lines go in at once: Enter inside the text
+        would run them, and with Broadcast on they would run on every ticked terminal."""
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        lines = text.rstrip("\n").split("\n")
+        if len(lines) > 1 and rc_quick.load_store()["confirm_paste"]:
+            peers = len(self.app.broadcast_peers(self)) if self.bcast_var.get() and hasattr(self.app, "broadcast_peers") else 0
+            preview = "\n".join(l[:80] for l in lines[:6]) + ("\n..." if len(lines) > 6 else "")
+            if not messagebox.askyesno("Paste several lines", f"Paste {len(lines)} lines into {self.host['name']}"
+                                       + (f" and {peers} other terminal(s)" if peers else "")
+                                       + f"?\nEach line is run as you paste.\n\n{preview}", parent=self, icon="warning"):
+                return
+        text = text.replace("\n", "\r")
+        self.send_user(self.wrap_paste(text), paste_text=text)
 
     def clear(self):
         self.t.delete("1.0", "end")
@@ -636,10 +1038,10 @@ class TerminalTab(ttk.Frame):
     def tag_for(self, style):
         tag = self.styles.get(style)
         if tag is None:
-            fg, bg = style_colors(style)
+            fg, bg = style_colors(style, self.scheme)
             tag = f"st{len(self.styles)}"
             self.styles[style] = tag
-            self.t.tag_configure(tag, foreground=fg or DEFAULT_FG, background=bg or DEFAULT_BG,
+            self.t.tag_configure(tag, foreground=fg or self.scheme["fg"], background=bg or self.scheme["bg"],
                                  underline=style[3], overstrike=style[4])
             self.t.tag_raise("sel")
         return tag
@@ -678,3 +1080,247 @@ class TerminalTab(ttk.Frame):
             t.mark_set("insert", pos)
         if at_bottom:
             t.yview_moveto(1.0)
+
+
+class SplitTab(ttk.Frame):
+    """Several SSH terminals tiled in one tab (Session > New split view).
+
+    Each pane is a normal TerminalTab (reconnect, find, logging, scrollback all work per pane). The tab's
+    📡 button turns Broadcast on for every pane at once: whatever you type in one pane goes to all of them."""
+    MAX_PANES = 9
+
+    def __init__(self, app):
+        super().__init__(app.nb)
+        self.app = app
+        self.panes = []          # each: {"frame", "title", "tab", "host"}
+        self.active = None
+        self.zoomed = None
+        self.closed = False
+        self.layout_var = tk.StringVar(value="grid")
+        self.bcast_var = tk.BooleanVar(value=False)
+
+        bar = ttk.Frame(self)
+        bar.pack(side="top", fill="x")
+        ttk.Button(bar, text="➕ Add server ▾", command=self.add_menu).pack(side="left", padx=4, pady=2)
+        lay = ttk.Menubutton(bar, text="▦ Layout ▾")
+        lay.pack(side="left", padx=2)
+        lm = tk.Menu(lay, tearoff=0)
+        for label, val in (("Grid (automatic)", "grid"), ("Side by side", "cols"), ("Stacked", "rows")):
+            lm.add_radiobutton(label=label, variable=self.layout_var, value=val, command=self.relayout)
+        lay.configure(menu=lm)
+        ttk.Checkbutton(bar, text="📡 Type in ALL panes", variable=self.bcast_var,
+                        command=self.toggle_broadcast).pack(side="left", padx=10)
+        ttk.Button(bar, text="💾 Save workspace", command=lambda: self.app.save_workspace()).pack(side="left")
+        self.info = tk.StringVar(value="")
+        ttk.Label(bar, textvariable=self.info).pack(side="right", padx=8)
+
+        self.area = ttk.Frame(self)
+        self.area.pack(fill="both", expand=True)
+        self.hint = ttk.Label(self.area, text="Click ➕ Add server to place a terminal here.\n"
+                              "Add up to 9. Double-click a pane's title to zoom it.", justify="center")
+        self.hint.place(relx=0.5, rely=0.5, anchor="center")
+
+    # ── panes ──
+    def terminals(self):
+        return [p["tab"] for p in self.panes]
+
+    def add_menu(self):
+        m = tk.Menu(self, tearoff=0)
+        hosts = sorted(self.app.hosts, key=lambda h: (h["group"].lower(), h["name"].lower()))
+        if not hosts:
+            m.add_command(label="(no servers yet)", state="disabled")
+        groups = {}
+        for h in hosts:
+            groups.setdefault(h["group"] or "Ungrouped", []).append(h)
+        for g, items in groups.items():
+            gm = tk.Menu(m, tearoff=0)
+            for h in items:
+                gm.add_command(label=f"{h['name']}  ({h['address']})", command=lambda h=h: self.add_host(h))
+            m.add_cascade(label=f"{g}  [{len(items)}]", menu=gm)
+        self.app.theme.paint(m)
+        m.tk_popup(self.winfo_rootx() + 20, self.winfo_rooty() + 30)
+
+    def add_host(self, h):
+        if len(self.panes) >= self.MAX_PANES:
+            messagebox.showinfo("Split view", f"A split view holds up to {self.MAX_PANES} terminals.", parent=self)
+            return None
+        c = self.app.credentials(h)
+        if not c:
+            return None
+        frame = ttk.Frame(self.area, relief="solid", borderwidth=1)
+        head = ttk.Frame(frame)
+        head.pack(side="top", fill="x")
+        title = ttk.Label(head, text=h["name"], font=("Segoe UI", 9, "bold"))
+        title.pack(side="left", padx=6)
+        pane = {"frame": frame, "title": title, "host": h}
+        ttk.Button(head, text="✕", width=3, command=lambda: self.remove_pane(pane)).pack(side="right", padx=2)
+        ttk.Button(head, text="⛶", width=3, command=lambda: self.zoom(pane)).pack(side="right")
+        title.bind("<Double-1>", lambda e: self.zoom(pane))
+        tab = TerminalTab(self.app, h, *c, parent=frame)
+        tab.pack(side="top", fill="both", expand=True)
+        pane["tab"] = tab
+        tab.t.bind("<FocusIn>", lambda e: self.set_active(pane), add="+")
+        if self.bcast_var.get():
+            tab.bcast_var.set(True)
+        self.panes.append(pane)
+        self.hint.place_forget()
+        self.relayout()
+        self.app.theme.paint(frame)
+        try:
+            self.app.mark_connected(h)
+        except Exception:
+            core.log.debug("mark_connected failed for split pane", exc_info=True)
+        tab.t.focus_set()
+        return pane
+
+    def remove_pane(self, pane):
+        if pane not in self.panes:
+            return
+        self.panes.remove(pane)
+        pane["tab"].close()
+        pane["frame"].destroy()
+        if self.zoomed is pane:
+            self.zoomed = None
+        if self.active is pane:
+            self.active = None
+        if not self.panes:
+            self.hint.place(relx=0.5, rely=0.5, anchor="center")
+        self.relayout()
+        self.app.broadcast_changed()
+
+    def set_active(self, pane):
+        self.active = pane
+        for p in self.panes:
+            p["title"].configure(text=("▶ " if p is pane else "") + p["host"]["name"])
+
+    def zoom(self, pane):
+        self.zoomed = None if self.zoomed is pane else pane
+        self.relayout()
+        pane["tab"].t.focus_set()
+
+    # ── layout ──
+    def relayout(self):
+        for w in self.area.winfo_children():
+            if w is not self.hint:
+                w.grid_forget()
+        for i in range(self.MAX_PANES + 1):
+            self.area.rowconfigure(i, weight=0)
+            self.area.columnconfigure(i, weight=0)
+        shown = [self.zoomed] if self.zoomed in self.panes else self.panes
+        n = len(shown)
+        if n == 0:
+            self.info.set("")
+            return
+        mode = self.layout_var.get()
+        cols = 1 if n == 1 else (n if mode == "cols" else 1 if mode == "rows" else int(n ** 0.5 + 0.999))
+        rows = -(-n // cols)
+        for i, p in enumerate(shown):
+            r, c = divmod(i, cols)
+            span = cols - c if i == n - 1 else 1   # a last, lonely pane fills its row
+            p["frame"].grid(row=r, column=c, columnspan=span, sticky="nsew", padx=1, pady=1)
+        for r in range(rows):
+            self.area.rowconfigure(r, weight=1, uniform="r")
+        for c in range(cols):
+            self.area.columnconfigure(c, weight=1, uniform="c")
+        self.info.set(f"{len(self.panes)} terminal(s)" + ("  ·  zoomed" if shown != self.panes else ""))
+
+    # ── broadcast ──
+    def toggle_broadcast(self):
+        on = self.bcast_var.get()
+        if on and not self.app.confirm_broadcast():
+            self.bcast_var.set(False)
+            return
+        for p in self.panes:
+            p["tab"].bcast_var.set(on)
+        self.app.broadcast_changed()
+
+    def refresh_broadcast(self):
+        """Keep the 📡 box in step when single panes are ticked or unticked."""
+        self.bcast_var.set(bool(self.panes) and all(p["tab"].bcast_var.get() for p in self.panes))
+
+    def close(self):
+        self.closed = True
+        for p in self.panes:
+            p["tab"].close()
+
+
+_MONO_CACHE = []
+
+
+def monospace_families(widget):
+    """Installed fixed-width font families (cached; the first call takes a moment)."""
+    if not _MONO_CACHE:
+        found = []
+        for fam in sorted(set(tkfont.families(widget)), key=str.lower):
+            if fam.startswith("@"):
+                continue
+            try:
+                if tkfont.Font(widget, family=fam, size=10).metrics("fixed"):
+                    found.append(fam)
+            except tk.TclError:
+                pass
+        _MONO_CACHE.extend(found)
+    return list(_MONO_CACHE)
+
+
+class FontDialog(tk.Toplevel):
+    """Pick the terminal font family (fixed-width fonts only) with a live sample; applies to every open terminal."""
+
+    def __init__(self, tab):
+        super().__init__(tab)
+        self.tab = tab
+        self.title("Terminal font")
+        self.transient(tab.winfo_toplevel())
+        self.geometry("+%d+%d" % (tab.winfo_rootx() + 80, tab.winfo_rooty() + 60))
+        fams = monospace_families(self)
+        body = ttk.Frame(self, padding=12)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Font (fixed-width fonts only)").pack(anchor="w")
+        self.var = tk.StringVar(value=tab.font.cget("family"))
+        self.box = ttk.Combobox(body, textvariable=self.var, values=fams, state="readonly", width=34)
+        self.box.pack(anchor="w", pady=(2, 8))
+        self.box.bind("<<ComboboxSelected>>", lambda e: self.preview())
+        self.sample = tk.Label(body, text="ls -la /var/log   0O  1lI  {}[]  ~/.ssh", anchor="w", bg=tab.scheme["bg"], fg=tab.scheme["fg"],
+                               font=(tab.font.cget("family"), tab.font.cget("size")), padx=8, pady=8)
+        self.sample._rc_fixed = True
+        self.sample.pack(fill="x")
+        bar = ttk.Frame(body)
+        bar.pack(fill="x", pady=(10, 0))
+        ttk.Button(bar, text="Use this font", command=self.ok).pack(side="right")
+        ttk.Button(bar, text="Cancel", command=self.destroy).pack(side="right", padx=6)
+
+    def preview(self):
+        self.sample.configure(font=(self.var.get(), self.tab.font.cget("size")))
+
+    def ok(self):
+        fam = self.var.get()
+        if fam:
+            self.tab.set_pref(font=fam)
+            for t in self.tab.terminals_to_update():
+                t.apply_font(fam)
+        self.destroy()
+
+
+class _ZmodemUi(rc_zmodem.Ui):
+    """Connects a running Zmodem transfer to the terminal tab: where received files go, the progress line, Cancel."""
+
+    def __init__(self, tab):
+        self.tab, self.folder, self.last = tab, "", 0.0
+
+    def accept_file(self, name, size):
+        from rc_files import unique_name
+        taken = os.listdir(self.folder) if os.path.isdir(self.folder) else []
+        final = unique_name(name, taken, "copy")
+        return ("save", os.path.join(self.folder, final))
+
+    def progress(self, name, done, total, sending):
+        now = time.time()
+        if now - self.last < 0.2 and done < total:
+            return
+        self.last = now
+        pct = f"{min(100, done * 100 // total)}%  " if total else ""
+        msg = f"Zmodem {'sending' if sending else 'receiving'} {name}: {pct}{core.fmt_size(done)}" + (f" of {core.fmt_size(total)}" if total else "")
+        self.tab.app.post(lambda: self.tab.app.status.set(msg))
+
+    def cancelled(self):
+        return self.tab.zm_cancel.is_set()
