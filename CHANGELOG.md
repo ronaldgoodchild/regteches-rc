@@ -12,6 +12,7 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 - RC remembers the open SSH / Files / Stats / Telnet / Serial tabs on exit (optional) and reopens them on the next start.
 
 **Fixed**
+- RC no longer stops at start-up on Python builds whose Tk does not know the key name `ISO_Left_Tab` (Ctrl+Shift+Tab now also uses `Control-Shift-Tab`).
 - The background status check ignored a server's proxy, so servers reachable only through a proxy always showed red.
 
 ## 2.11.0
