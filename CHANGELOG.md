@@ -3,7 +3,7 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
-## Unreleased
+## 2.13.0
 
 **New**
 - **Deep scan: all ports.** In the Network scan, **Scan more ports on this machine…** (and the Ports box when one address is scanned) accepts `all` to try every port 1-65535 on that one machine, with progress and a Stop button that keeps what was found.
