@@ -2188,7 +2188,11 @@ class App:
         for d in "123456789":
             root.bind(f"<Control-Key-{d}>", lambda e, d=d: self.handle_shortcut(d, True, False) and "break")
         root.bind("<Control-Tab>", lambda e: self.handle_shortcut("Tab", True, False) and "break")
-        root.bind("<Control-ISO_Left_Tab>", lambda e: self.handle_shortcut("ISO_Left_Tab", True, True) and "break")
+        for seq in ("<Control-Shift-Tab>", "<Control-ISO_Left_Tab>"):  # not every Tk build knows ISO_Left_Tab (Python 3.11 on Windows does not)
+            try:
+                root.bind(seq, lambda e: self.handle_shortcut("ISO_Left_Tab", True, True) and "break")
+            except tk.TclError:
+                log.info("This Tk does not understand %s; the other Ctrl+Shift+Tab binding is used", seq)
         root.bind("<Control-Shift-D>", lambda e: self.handle_shortcut("D", True, True) and "break")
         root.protocol("WM_DELETE_WINDOW", self.on_exit)
         self.drag_tab = None
