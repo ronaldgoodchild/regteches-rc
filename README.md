@@ -1,4 +1,4 @@
-# REGTeches RC - Remote Connection Manager  v2.12.0
+# REGTeches RC - Remote Connection Manager  v2.13.0
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
