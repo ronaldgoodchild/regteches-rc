@@ -199,7 +199,7 @@ Type a network (`192.168.1.0/24`, filled in for this PC's own /24) or a range (`
 answer also proves a machine is there); each machine found is listed with its name (reverse DNS), MAC address (from
 this PC's ARP table), open ports with service names, and **✔ name** if it is already a server in RC. **Add as server…**
 (or double-click) opens the Add form prefilled (name, address, MAC, and a sensible double-click action: SSH, Remote
-Desktop, VNC or the web page). **Scan more ports on this machine…** deep-scans one machine; **Copy** and **Export CSV…**
+Desktop, VNC or the web page). **Scan more ports on this machine…** deep-scans the machine you clicked: type a range such as `1-1024`, or `all` to try every port from 1 to 65535 (a few minutes; shows progress, **Stop** ends it early and keeps what it found). `all` only works on one machine, never on a whole network. **Copy** and **Export CSV…**
 save the list; click a heading to sort. At most 1024 addresses per scan. Scan only networks you are allowed to scan.
 
 ## Local servers: TFTP and HTTP (Tools > Network > Local servers)
