@@ -3,6 +3,17 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.13.1
+
+**New**
+- **A web manual** (`docs/`, also shipped as the `manual` folder next to `RC.exe`): a web page with a menu bar, a contents list with search, pictures of every screen, a video demonstration, a first-five-minutes guide, a walk through each menu, how to add servers and use every feature, shortcuts, where RC keeps its files, and a help / FAQ section. All pictures and the video use sample data.
+- **Help > Manual (web page)** opens it (the local copy if present, otherwise the online page).
+- The picture and video tools used to make it (`release/capture_manual.py`, `release/demo_env.py`).
+
+**Changed**
+- The README's "What's new" section now covers everything since 2.0, and `QUICK START.txt` covers the newer features and the manual.
+- Version history note: a short-lived 2.1.0 build published on GitHub in November 2026 contained a one-file settings export (`.rcpack`). It was replaced by the encrypted **Backup and restore** (2.7.0) and is not part of the later versions. The 2.1.0 entry below lists what 2.1.0 means in the current source (split view, broadcast and so on).
+
 ## 2.13.0
 
 **New**

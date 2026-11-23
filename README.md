@@ -1,4 +1,4 @@
-# REGTeches RC - Remote Connection Manager  v2.13.0
+# REGTeches RC - Remote Connection Manager  v2.13.1
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
@@ -15,15 +15,23 @@ servers by mouse, group them, search them, and click the way in you want.
 
 **Help > Quick start guide** shows this whole guide as a formatted web page in your browser (contents list on the left).
 
+**New here? Read the manual:** [docs/index.html](docs/index.html) (also **Help > Manual (web page)** in the program) is a web page with pictures of every screen, a video, and a step-by-step guide to each menu.
+
 **Install with Scoop:** `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc` (updates with `scoop update rc`; your servers are kept between updates).
 
 **Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_monitor.py` (live stats), `rc_identity.py` (identities and proxies), `rc_quick.py` (quick commands, history, login scripts), `rc_transport.py` (Telnet and Serial), `rc_backup.py` (backup), `rc_netscan.py` (network scan), `rc_localsrv.py` (TFTP/HTTP servers), `rc_import.py` (MobaXterm/Xshell import), `rc_record.py` (recording), `rc_notes.py` (notes), `rc_glances.py` (Glances), `rc_zmodem.py` (Zmodem), `rc_prefs.py` (preferences and remembered tabs), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys) and `rc_theme.py` - keep the eighteen together. (Serial also needs `pyserial`, in `requirements.txt`.) First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
 
-## What's new in 2.0
+## What's new since 2.0
 
-A real full-screen SSH terminal with auto-reconnect, live status dots and an Overview home screen, other addresses
-and jump servers, Wake-on-LAN, a trusted-host-keys manager, VNC and RustDesk buttons, and this guide as a web page.
-The full list is in `CHANGELOG.md`. Your servers and saved logins carry over unchanged.
+RC has grown a lot since 2.0. In short (the full list, version by version, is in `CHANGELOG.md`):
+
+- **Terminal:** split view with up to 9 terminals and Broadcast, saved workspaces, session recording and playback, 8 colour schemes and a font choice, quick commands and history, after-login scripts, Zmodem (`sz` / `rz`), Telnet and Serial (COM port) terminals, a multi-line paste check.
+- **Monitoring:** a live **Stats** view (CPU, memory, network, disks, processes, services, systemd logs), and **Glances** support so PCs and servers without SSH, including Windows, can be watched too.
+- **File manager:** right-click menu with copy / cut / paste on the server, clickable path trail, sortable columns, transfer queue with pause, resume and retry.
+- **Network tools:** a **Network scan** (with a deep scan of all 65,535 ports on one machine), temporary **TFTP / HTTP servers**, SOCKS5 / HTTP **proxies**, jump servers and other addresses.
+- **Logins:** reusable **identities**, one-click SSH keys for the whole lab, trusted host keys.
+- **Housekeeping:** encrypted **backup and restore** (moves your servers and saved passwords to a new PC), **Notes**, import from PuTTY / WinSCP / MobaXterm / Xshell, Preferences, tab locking and shortcuts.
+- **A web manual** with pictures, a video and every menu explained: **Help > Manual (web page)**, or the `manual` folder next to `RC.exe`, or the `docs` folder in the source.
 
 ## A look around
 

@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REGTeches RC - Manual and Tour</title>
+<meta name="description" content="REGTeches RC is a free Windows program that puts SSH, SFTP, Remote Desktop, VNC, RustDesk, tunnels, live server stats and more in one window. This page is the tour and the full manual.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0b1220; --panel:#111b2e; --panel2:#16233b; --line:#243556; --text:#e6edf7; --muted:#9db0cd;
+  --blue:#3b9eff; --blue2:#1f6fd1; --accent:#ffb454; --good:#3ddc97; --warn:#ffcc66; --code:#0a1424;
+  --radius:12px; --side:290px;
+}
+:root[data-theme="light"]{
+  --bg:#f4f7fc; --panel:#ffffff; --panel2:#eef3fb; --line:#d4deee; --text:#14213b; --muted:#53627f;
+  --blue:#1a6fd4; --blue2:#0f55a8; --accent:#c76a00; --good:#168a5c; --warn:#a06500; --code:#eaf0fa;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+code,kbd{font-family:Consolas,"Cascadia Mono",monospace;font-size:.92em}
+code{background:var(--code);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow:auto}
+pre code{background:none;border:0;padding:0}
+img{max-width:100%;height:auto;display:block}
+/* ---------- top bar ---------- */
+header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:18px;max-width:1500px;margin:0 auto;padding:10px 20px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text);white-space:nowrap}
+.brand b{background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff;border-radius:8px;padding:2px 9px;letter-spacing:.5px}
+.brand small{color:var(--muted);font-weight:500}
+nav.main{display:flex;gap:4px;flex-wrap:wrap;margin-left:12px}
+nav.main a{color:var(--muted);padding:7px 12px;border-radius:8px;font-weight:600;font-size:.95rem}
+nav.main a:hover,nav.main a.on{background:var(--panel2);color:var(--text);text-decoration:none}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--blue2);background:var(--blue2);color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:.95rem}
+.btn:hover{filter:brightness(1.1);text-decoration:none}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line)}
+.iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:9px;padding:7px 11px;cursor:pointer;font-size:1rem}
+.menu-toggle{display:none}
+/* ---------- hero ---------- */
+.hero{max-width:1500px;margin:0 auto;padding:44px 20px 26px;display:grid;grid-template-columns:1.05fr 1fr;gap:38px;align-items:center}
+.hero h1{font-size:clamp(2rem,4.4vw,3.3rem);line-height:1.12;margin:.1em 0 .3em}
+.hero h1 span{color:var(--blue)}
+.hero p.lead{font-size:1.15rem;color:var(--muted);max-width:60ch}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0 8px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.badge{font-size:.82rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 11px;background:var(--panel)}
+.videobox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+video{width:100%;border-radius:10px;background:#000;display:block}
+.cap{color:var(--muted);font-size:.88rem;padding:8px 6px 0}
+/* ---------- sections ---------- */
+.wrap{max-width:1500px;margin:0 auto;padding:0 20px}
+section.band{padding:34px 0}
+h2.sec{font-size:1.75rem;margin:0 0 6px}
+p.sub{color:var(--muted);margin:0 0 22px;max-width:75ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.card h3{margin:.1em 0 .35em;font-size:1.05rem}
+.card p{margin:0;color:var(--muted);font-size:.95rem}
+.card .ic{font-size:1.6rem}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.gallery figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;cursor:zoom-in}
+.gallery figure:hover{border-color:var(--blue)}
+.gallery img{aspect-ratio:16/10;object-fit:cover;object-position:top left;width:100%}
+.gallery figcaption{padding:10px 14px;font-size:.92rem}
+.gallery figcaption b{display:block}
+.gallery figcaption span{color:var(--muted);font-size:.86rem}
+/* ---------- manual layout ---------- */
+.manual{display:grid;grid-template-columns:var(--side) minmax(0,1fr);gap:34px;max-width:1500px;margin:0 auto;padding:10px 20px 80px}
+aside.toc{position:sticky;top:70px;align-self:start;max-height:calc(100vh - 86px);overflow:auto;padding-right:8px}
+.toc .search{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:.95rem;margin-bottom:10px}
+.toc .group{margin:0 0 4px}
+.toc a{display:block;color:var(--muted);padding:5px 10px;border-left:3px solid transparent;border-radius:0 8px 8px 0;font-size:.93rem}
+.toc a.h2{font-weight:700;color:var(--text);margin-top:8px}
+.toc a.h3{padding-left:24px;font-size:.88rem}
+.toc a:hover{background:var(--panel2);text-decoration:none}
+.toc a.on{border-left-color:var(--blue);background:var(--panel2);color:var(--text)}
+.toc a.hide{display:none}
+article.doc{min-width:0}
+article.doc h2{font-size:1.65rem;margin:2.2em 0 .4em;padding-top:.6em;border-top:1px solid var(--line)}
+article.doc h2:first-child{border-top:0;margin-top:0}
+article.doc h3{font-size:1.2rem;margin:1.7em 0 .3em;color:var(--blue)}
+article.doc h4{font-size:1.02rem;margin:1.3em 0 .2em}
+article.doc p,article.doc li{max-width:78ch}
+article.doc ul,article.doc ol{padding-left:1.3em}
+article.doc li{margin:.25em 0}
+figure.shot{margin:16px 0 22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;max-width:980px}
+figure.shot img{width:100%;cursor:zoom-in}
+figure.shot figcaption{padding:9px 14px;color:var(--muted);font-size:.9rem;border-top:1px solid var(--line)}
+.twin{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:1000px}
+.twin figure.shot{margin:8px 0 14px}
+table{border-collapse:collapse;width:100%;max-width:980px;margin:12px 0 20px;font-size:.95rem}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--panel2)}
+tr:nth-child(even) td{background:color-mix(in srgb,var(--panel) 60%,transparent)}
+.note,.tip,.warn{border-left:4px solid var(--blue);background:var(--panel);border-radius:0 10px 10px 0;padding:10px 16px;margin:16px 0;max-width:80ch}
+.tip{border-color:var(--good)} .warn{border-color:var(--warn)}
+.note b:first-child,.tip b:first-child,.warn b:first-child{display:block;margin-bottom:2px}
+.steps{counter-reset:s;list-style:none;padding-left:0}
+.steps li{counter-increment:s;position:relative;padding:8px 12px 8px 52px;margin:10px 0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.steps li::before{content:counter(s);position:absolute;left:12px;top:8px;width:28px;height:28px;border-radius:50%;background:var(--blue2);color:#fff;display:grid;place-items:center;font-weight:700}
+.menuref h4{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 12px;display:inline-block}
+footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--muted);text-align:center}
+/* ---------- lightbox ---------- */
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;z-index:100;padding:24px;cursor:zoom-out}
+#lb.open{display:flex}
+#lb img{max-width:96vw;max-height:90vh;border-radius:8px;box-shadow:0 20px 70px #000}
+#lb p{position:fixed;bottom:14px;left:0;right:0;text-align:center;color:#ddd;margin:0}
+#top{position:fixed;right:18px;bottom:18px;z-index:40;display:none}
+/* ---------- small screens ---------- */
+@media (max-width:1050px){
+  .hero{grid-template-columns:1fr}
+  .manual{grid-template-columns:1fr}
+  aside.toc{position:fixed;left:0;top:0;bottom:0;width:min(86vw,330px);background:var(--bg);z-index:60;padding:70px 14px 20px;border-right:1px solid var(--line);transform:translateX(-102%);transition:transform .2s;max-height:none}
+  aside.toc.open{transform:none}
+  .menu-toggle{display:inline-block}
+  nav.main{display:none}
+  nav.main.open{display:flex;position:absolute;top:100%;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 20px;flex-direction:column;margin:0}
+  .twin{grid-template-columns:1fr}
+}
+@media print{header.top,aside.toc,.hero .videobox,#top{display:none}.manual{display:block}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="bar">
+    <button class="iconbtn menu-toggle" id="navToggle" aria-label="Menu">☰</button>
+    <a class="brand" href="#top-of-page"><b>RC</b> REGTeches <small>Remote Connection Manager</small></a>
+    <nav class="main" id="mainNav">
+      <a href="#features">Features</a>
+      <a href="#video">Video</a>
+      <a href="#gallery">Gallery</a>
+      <a href="#manual">Manual</a>
+      <a href="#menus">Menu reference</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="#faq">Help &amp; FAQ</a>
+      <a href="#download">Download</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="themeBtn" title="Light / dark">🌓</button>
+    <a class="btn" href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">⬇ Download</a>
+  </div>
+</header>
+
+<div id="top-of-page"></div>
+<section class="hero">
+  <div>
+    <span class="badge">Version 2.13.1 &nbsp;·&nbsp; Free &amp; open source (MIT) &nbsp;·&nbsp; Windows</span>
+    <h1>Every server. <span>One window.</span></h1>
+    <p class="lead">REGTeches RC keeps all the machines you look after in one list and opens them the way you want with one click: a real SSH terminal, drag-and-drop file transfer, Remote Desktop, VNC, RustDesk, tunnels, live CPU / memory / disk stats, network scanning and more.</p>
+    <div class="cta">
+      <a class="btn" href="#download">⬇ Get RC</a>
+      <a class="btn ghost" href="#manual">📖 Read the manual</a>
+      <a class="btn ghost" href="#video">▶ Watch the demo</a>
+    </div>
+    <div class="badges">
+      <span class="badge">SSH · SFTP · FTP/FTPS</span><span class="badge">RDP · VNC · RustDesk</span><span class="badge">Telnet · Serial</span>
+      <span class="badge">Tunnels · Proxies · Jump hosts</span><span class="badge">Live stats · Glances</span><span class="badge">Encrypted backup</span>
+    </div>
+  </div>
+  <div class="videobox">
+    <video controls preload="metadata" poster="assets/m01_overview.png" id="heroVideo">
+      <source src="assets/RC_demo.mp4" type="video/mp4">
+      Your browser cannot play this video. <a href="assets/RC_demo.mp4">Download it</a>.
+    </video>
+    <div class="cap">A tour of RC with sample data: no real servers are shown anywhere on this page.</div>
+  </div>
+</section>
+
+<section class="band" id="features"><div class="wrap">
+  <h2 class="sec">What RC can do</h2>
+  <p class="sub">Everything below is built in. Nothing to install on your servers: RC only needs the logins you already use.</p>
+  <div class="cards">
+    <div class="card"><div class="ic">🖥</div><h3>A real SSH terminal</h3><p>Full-screen programs (vim, htop, tmux), 256 colours, scrollback, search, auto-reconnect, 8 colour schemes, session recording.</p></div>
+    <div class="card"><div class="ic">📁</div><h3>Two-pane file manager</h3><p>SFTP, FTP and FTPS with drag and drop, a transfer queue (pause, retry), folder sync, built-in editor, copy and paste on the server.</p></div>
+    <div class="card"><div class="ic">📊</div><h3>Live server stats</h3><p>CPU, memory, network, disks, processes, services and listening ports, over SSH or from Glances (works for Windows PCs too).</p></div>
+    <div class="card"><div class="ic">🧩</div><h3>Split view &amp; broadcast</h3><p>Up to 9 terminals in one tab. Type once, send to all. Save the layout as a workspace and reopen it in a click.</p></div>
+    <div class="card"><div class="ic">🔎</div><h3>Network scan</h3><p>Find the machines on your network, their open ports, names and MAC addresses, and add one as a server in a click. Deep scan checks all 65,535 ports.</p></div>
+    <div class="card"><div class="ic">🔑</div><h3>Logins done right</h3><p>Saved passwords encrypted by Windows, one-click SSH keys for the whole lab, shared identities, trusted host keys.</p></div>
+    <div class="card"><div class="ic">🌐</div><h3>Tunnels, proxies, jump hosts</h3><p>Reach private web pages and databases, go through SOCKS5 / HTTP proxies and bastion servers, Wake-on-LAN.</p></div>
+    <div class="card"><div class="ic">⚡</div><h3>Faster every day</h3><p>Ctrl+K quick connect, quick commands and history, after-login scripts, snippets run on many servers at once, Zmodem.</p></div>
+    <div class="card"><div class="ic">📝</div><h3>Notes &amp; documentation</h3><p>Markdown notes tied to servers. Import from PuTTY, WinSCP, MobaXterm, Xshell. Encrypted backup to move to a new PC.</p></div>
+    <div class="card"><div class="ic">🎨</div><h3>Seven themes</h3><p>Sky Blue, Sunset, Mint Fresh, Royal Dark, Neon Purple, Classic Dark and Classic Light.</p></div>
+  </div>
+</div></section>
+
+<section class="band" id="video"><div class="wrap">
+  <h2 class="sec">Video demonstration</h2>
+  <p class="sub">Adding a server, opening a terminal, split view, files, live stats, the network scan, notes and more, recorded from the real program with sample data.</p>
+  <div class="videobox" style="max-width:1100px"><video controls preload="metadata" poster="assets/m01_overview.png"><source src="assets/RC_demo.mp4" type="video/mp4"></video></div>
+</div></section>
+
+<section class="band" id="gallery"><div class="wrap">
+  <h2 class="sec">Gallery</h2>
+  <p class="sub">Click any picture to enlarge it. All pictures use made-up servers and addresses.</p>
+  <div class="gallery" id="galleryGrid"></div>
+</div></section>
+
+<div class="manual" id="manual">
+<aside class="toc" id="toc"><input class="search" id="tocSearch" type="search" placeholder="Search the manual…" aria-label="Search the manual"><div id="tocList"></div></aside>
+<article class="doc" id="doc">
+
+<h2 id="start">Quick start</h2>
+<p>RC is a single window that lists your servers on the left and opens whatever you click on the right, in tabs. If you can type an IP address, you can use it.</p>
+<h3 id="install">Install</h3>
+<ul>
+<li><b>Zip (easiest):</b> download <code>REGTeches_RC_v2.13.1.zip</code> from the <a href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">Releases page</a>, unzip it anywhere (Desktop, Documents, a USB stick) and double-click <code>RC.exe</code>. Nothing is installed. Your servers are saved next to <code>RC.exe</code>, so the whole folder can be moved or copied.</li>
+<li><b>Scoop:</b> <code>scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches</code> then <code>scoop install rc</code>. Update with <code>scoop update rc</code>; your servers are kept between updates.</li>
+<li><b>From source:</b> install Python 3.11 or newer, run <code>pip install -r requirements.txt</code>, then double-click <code>RC.bat</code> (or run <code>python rc_manager.py</code>).</li>
+</ul>
+<div class="note"><b>Windows only.</b> RC uses Windows features for Remote Desktop, saved-password protection and the menus. The EXE is not code-signed, so Windows SmartScreen may show a warning the first time: choose <em>More info</em> then <em>Run anyway</em>.</div>
+<h3 id="first-five">Your first five minutes</h3>
+<ol class="steps">
+<li><b>Add a server.</b> Press <kbd>Ctrl</kbd>+<kbd>N</kbd> (or <em>File &gt; Add server</em>). Type a name and the server's IP address or DNS name, then click <b>Save</b>. Only the address is required.</li>
+<li><b>Select it</b> in the list on the left. Its page shows a row of connection buttons: SSH, Files, Remote Desktop, Web and more.</li>
+<li><b>Click how you want to connect.</b> SSH opens a terminal tab; Files opens a two-pane file manager; Remote Desktop starts Windows' own client already filled in.</li>
+<li><b>Stop typing passwords.</b> Open <em>Tools &gt; Credentials &gt; Set up keys for all servers</em>, tick your servers and type each password once. RC installs a key so later logins need no password.</li>
+<li><b>Jump anywhere fast.</b> Press <kbd>Ctrl</kbd>+<kbd>K</kbd>, type a few letters of a server name and press <kbd>Enter</kbd>.</li>
+</ol>
+<figure class="shot"><img src="assets/m01_overview.png" alt="The Overview screen" loading="lazy"><figcaption>The Overview: live status dots, favourites and recently used servers. The server list is on the left, the tab area on the right.</figcaption></figure>
+
+<h2 id="window">The main window</h2>
+<p>The window has four parts:</p>
+<ul>
+<li><b>Menu bar</b> across the top: <em>File, Connect, Servers, Session, View, Tools, Help</em>. The <a href="#menus">menu reference</a> explains every item.</li>
+<li><b>Server list</b> on the left, grouped by the Group you give each server, with a status dot beside every server and a search box on top.</li>
+<li><b>Tab area</b> on the right. The first tab is always the <em>Servers</em> tab (the Overview or the selected server's page). Every terminal, file manager, Stats view and tool opens as another tab.</li>
+<li><b>Status bar</b> along the bottom, showing the last action and the version.</li>
+</ul>
+<h3 id="status-dots">Status dots</h3>
+<table>
+<tr><th>Dot</th><th>Meaning</th></tr>
+<tr><td>🟢 Green</td><td>The server answered.</td></tr>
+<tr><td>🟠 Amber</td><td>It answered only on one of its <em>other addresses</em> (for example over Tailscale).</td></tr>
+<tr><td>🔴 Red</td><td>Not answering.</td></tr>
+<tr><td>⚪ Grey</td><td>Not checked yet.</td></tr>
+</table>
+<p>RC checks every server in the background when it starts and then every minute. It tries the SSH port, then the Remote Desktop port (a refused connection still proves the machine is on), then a ping. Changes are written to <code>rc.log</code>. Click <b>⟳ Check now</b> to re-check immediately.</p>
+<h3 id="overview">The Overview</h3>
+<p>With no server selected the first tab shows how many servers are up or not answering, your <b>★ Favourites</b>, the servers you used <b>recently</b> (and how long ago) and a <b>⚠ Not answering</b> list. Double-click any entry to use its default connection; right-click for the full menu. Click <b>🏠 Overview</b> on a server's page, or a group heading, to come back.</p>
+<h3 id="tabs">Working with tabs</h3>
+<ul>
+<li>Close a tab with the × , middle-click, right-click &gt; <em>Close</em>, or <kbd>Ctrl</kbd>+<kbd>W</kbd>.</li>
+<li><b>Right-click a tab:</b> Duplicate this session, Rename, <b>🔒 Lock</b> (a locked tab survives Close, Disconnect all and Close other tabs until you unlock it), and Close others / to the right / to the left.</li>
+<li><b>Drag a tab</b> to reorder. The Servers tab stays first.</li>
+<li><kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> jump to a tab (9 = the last), <kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> go to the next / previous tab.</li>
+<li>Optionally RC reopens last session's SSH, Files, Stats, Telnet and Serial tabs at start-up (<a href="#prefs">Preferences</a>).</li>
+</ul>
+
+<h2 id="add">Adding servers</h2>
+<p>A "server" in RC is any machine or device you connect to: a Linux box, a NAS, a router, a Windows PC. Add it once; RC remembers how to reach it.</p>
+<h3 id="add-form">The Add / Edit form</h3>
+<p>Use <em>File &gt; Add server…</em> (<kbd>Ctrl</kbd>+<kbd>N</kbd>), or <em>File &gt; Edit selected server…</em> to change one. The form opens as a tab, split into pages so it fits a small screen. The buttons <b>Save · Verify · Test login · Set up key login · Cancel</b> stay at the top of every page.</p>
+<figure class="shot"><img src="assets/m03_add_general.png" alt="Add server, General page" loading="lazy"><figcaption>Add a server: the General page. Only the address is required.</figcaption></figure>
+<table>
+<tr><th>Page</th><th>What you set there</th></tr>
+<tr><td><b>General</b></td><td>Name (what you see in the list), IP address or DNS name, Group (servers with the same group are listed together), what a <b>double-click</b> does, and free-text notes.</td></tr>
+<tr><td><b>Login</b></td><td>Username and password (saved encrypted, or leave empty to be asked each time), a <b>Saved login (identity)</b> to share one login across servers, and an optional SSH key file.</td></tr>
+<tr><td><b>Connections</b></td><td>Ports (SSH, Remote Desktop, VNC), the RustDesk ID and password, file-transfer mode (SFTP, FTP or FTPS) and port, and the web and mail addresses.</td></tr>
+<tr><td><b>Network</b></td><td><b>Other addresses</b> (LAN, Tailscale, ZeroTier… tried in order), <b>Connect through</b> (a jump server), <b>Connect via proxy</b> (SOCKS5 or HTTP), and the MAC address for Wake-on-LAN.</td></tr>
+<tr><td><b>Glances</b></td><td>Use Glances for this server's Stats: port, login, https, and a Detect / test button.</td></tr>
+<tr><td><b>More connections</b></td><td>Extras: a second web page, FTP and SFTP together, SSH on another port, a share path, <b>Telnet</b> or <b>Serial (COM port)</b>, each optionally with its own login.</td></tr>
+<tr><td><b>After login</b></td><td>A short script of <code>wait-for-text =&gt; what to type</code> steps run after every connect.</td></tr>
+</table>
+<div class="twin">
+<figure class="shot"><img src="assets/m03_add_login.png" alt="Login page" loading="lazy"><figcaption>Login page</figcaption></figure>
+<figure class="shot"><img src="assets/m03_add_network.png" alt="Network page" loading="lazy"><figcaption>Network page: other addresses, jump server, proxy, MAC</figcaption></figure>
+<figure class="shot"><img src="assets/m03_add_connections.png" alt="Connections page" loading="lazy"><figcaption>Connections page</figcaption></figure>
+<figure class="shot"><img src="assets/m03_add_more_connections.png" alt="More connections page" loading="lazy"><figcaption>More connections page</figcaption></figure>
+</div>
+<h3 id="verify">Verify, Test login and Set up key login</h3>
+<ul>
+<li><b>✔ Verify</b> checks what you typed before you save: a valid IP or DNS name (it catches <code>192.168.1.300</code> or <code>host:22</code>), ports in range, that an SSH key file exists and is a private key (not the <code>.pub</code>), sensible web and mail addresses, and duplicates. Mistakes block Save. Then it tests the server itself: the name resolves, SSH / FTP ports really answer as SSH / FTP, Remote Desktop and the web page respond. Only a connection test is made; no login is tried.</li>
+<li><b>🔑 Test login</b> really logs in with what you typed and tells you whether it worked, before you rely on it.</li>
+<li><b>🔐 Set up key login</b> makes an SSH key (or uses the one you chose), installs it on the server, proves it works with the key alone and offers to forget the saved password. Works for Linux, Unix, NAS devices and Windows OpenSSH (including administrator accounts).</li>
+</ul>
+<h3 id="import">Bringing in servers you already have</h3>
+<p><em>File &gt; Import servers</em> offers four sources. Each opens the same selection list; servers already in RC are marked and not selected, so nothing is added twice.</p>
+<table>
+<tr><th>Source</th><th>How</th></tr>
+<tr><td>CSV / text file</td><td>One server per line: <code>name,address,group,user</code> (or just an address). Bad addresses and duplicates are skipped and listed.</td></tr>
+<tr><td>PuTTY / WinSCP / ssh config</td><td>RC reads the saved sessions those programs keep. Their stored passwords cannot be read (they are encrypted for those programs), so enter a password once or use a key.</td></tr>
+<tr><td>MobaXterm</td><td>In MobaXterm choose <em>Sessions &gt; Export</em> to get a <code>.mxtsessions</code> file, then <em>From MobaXterm…</em>. SSH, SFTP, Telnet, RDP, VNC, FTP and Serial sessions come across; folders become groups.</td></tr>
+<tr><td>Xshell</td><td><em>From Xshell (Sessions folder)…</em> and pick the folder holding your <code>.xsh</code> files (usually <code>Documents/NetSarang Computer/&lt;version&gt;/Xshell/Sessions</code>). SSH, SFTP, Telnet and FTP sessions come across.</td></tr>
+</table>
+<p>You can also <b>find machines automatically</b> with the <a href="#netscan">Network scan</a> and add them with a click, and <em>File &gt; Export servers to a CSV file…</em> saves names, addresses, groups and users (never passwords).</p>
+<h3 id="organise">Organising the list</h3>
+<ul>
+<li><b>Groups:</b> type the same Group on several servers (for example <em>Production</em>, <em>Home Lab</em>, <em>NAS &amp; Storage</em>) and they are listed together.</li>
+<li><b>★ Favourites:</b> right-click &gt; <em>Add to favourites</em> (or <em>File &gt; Add / remove favourite</em>). Favourites appear in their own group at the top and on the Overview.</li>
+<li><b>Duplicate</b> a server (<em>File &gt; Duplicate selected server</em>) to start from a similar one. <b>Delete</b> removes it from RC only; the server itself is never touched.</li>
+<li><b>Copy address</b> puts the address on the clipboard.</li>
+</ul>
+
+<h2 id="connect">Connecting</h2>
+<p>Select a server, then click a button along the top of its page, use the <em>Connect</em> menu, or double-click the server to run its <b>default action</b> (you choose it per server). The <em>Servers</em> menu lists group &gt; server &gt; connection if you prefer menus.</p>
+<figure class="shot"><img src="assets/m02_server_buttons.png" alt="A server's page with connection buttons" loading="lazy"><figcaption>A server's page: every way in, one click. A button with ▾ means the server has several of that kind (for example several web pages).</figcaption></figure>
+<table>
+<tr><th>Button</th><th>What happens</th></tr>
+<tr><td><b>SSH (in app)</b></td><td>A real terminal tab. See <a href="#terminal">The SSH terminal</a>.</td></tr>
+<tr><td><b>Files</b></td><td>Two-pane file manager (this PC left, the server right) for SFTP, FTP or FTPS. See <a href="#files">File manager</a>.</td></tr>
+<tr><td><b>📊 Stats</b></td><td>Live CPU, memory, network, disks, processes and ports. See <a href="#stats">Live stats</a>.</td></tr>
+<tr><td><b>Remote Desktop</b></td><td>Opens Windows' own <code>mstsc</code> with the address, port and username filled in.</td></tr>
+<tr><td><b>VNC</b></td><td>Opens your installed VNC viewer (TightVNC, RealVNC, UltraVNC or TigerVNC) at the server's VNC port. RC never puts the VNC password on a command line.</td></tr>
+<tr><td><b>RustDesk</b></td><td>Starts <code>rustdesk.exe --connect &lt;ID&gt;</code>. Leave the ID blank to connect by IP (needs <em>Enable direct IP access</em> in RustDesk on the remote PC).</td></tr>
+<tr><td><b>Web</b></td><td>Opens the server's web address in your default browser.</td></tr>
+<tr><td><b>PowerShell (remote)</b></td><td>A new PowerShell window running <code>Enter-PSSession</code> to the server (WinRM, for Windows servers).</td></tr>
+<tr><td><b>SSH (separate window)</b></td><td>Windows' own <code>ssh</code> in a console, if you prefer it to the in-app terminal.</td></tr>
+<tr><td><b>Mail</b></td><td>Opens the server's webmail address.</td></tr>
+<tr><td><b>Network share</b></td><td>Opens <code>\\address</code> (or <code>\\address\share</code>) in File Explorer.</td></tr>
+<tr><td><b>Ping</b></td><td>Four pings; the result appears in a popup.</td></tr>
+<tr><td><b>⏻ Wake</b></td><td>Sends a Wake-on-LAN packet (needs the server's MAC address).</td></tr>
+<tr><td><b>✔ Check this server</b></td><td>Looks the name up in DNS and tests each service, reporting times and any problem.</td></tr>
+<tr><td><b>Telnet / Serial</b></td><td>Appear only for servers that have such a connection added under <em>More connections</em>.</td></tr>
+</table>
+<h3 id="quick">Quick connect (Ctrl+K)</h3>
+<p>Press <kbd>Ctrl</kbd>+<kbd>K</kbd>, type a few letters (<code>plex ssh</code>, <code>nas web</code>, <code>tunnel</code>) and press <kbd>Enter</kbd>. It searches every server and every connection (including extras), your tunnels and snippets, and a few commands. <kbd>↑</kbd>/<kbd>↓</kbd> choose, <kbd>Esc</kbd> closes.</p>
+<figure class="shot"><img src="assets/m20_quick_connect.png" alt="Quick connect" loading="lazy"><figcaption>Quick connect finds servers, connections, tunnels and snippets as you type.</figcaption></figure>
+<h3 id="multi">Several connections per server</h3>
+<p>Every server gets all the standard connection types with no setup. A server can also have <b>extras</b> under <em>More connections</em>: a second or third web page (Sonarr, Radarr, a NAS admin page…), FTP <em>and</em> SFTP, SSH on another port, a share path, a different username. The server's page lists everything it has (extras in blue; double-click to open).</p>
+<h3 id="vnc-rustdesk">VNC and RustDesk</h3>
+<p>RC does not bundle either viewer; it uses the one already installed. For VNC set the <b>VNC port</b> (default 5900; display <code>:1</code> is 5901). For RustDesk put the PC's <b>RustDesk ID</b> in the Connections page. If a viewer lives in an unusual place, add <code>"vnc_viewer": "C:\\path\\viewer.exe"</code> or <code>"rustdesk_path": "C:\\path\\rustdesk.exe"</code> to <code>settings.json</code>.</p>
+<h3 id="addresses">Other addresses, jump servers and Wake-on-LAN</h3>
+<ul>
+<li><b>Other addresses:</b> a server can have several (LAN, Tailscale, ZeroTier). SSH and file transfers use the first one that answers; the dot turns amber when only an alternate works. Put your usual address in <em>IP address or DNS name</em>, the rest in <em>Other addresses</em>, comma-separated.</li>
+<li><b>Connect through (jump server):</b> reach a machine only visible from another server (a bastion, a Raspberry Pi at a remote site). Pick the jump server; RC logs in there and tunnels the connection through it for SSH, files, tunnels, snippets and key setup. A jump server may use another jump server (up to three deep).</li>
+<li><b>Wake-on-LAN:</b> enter the machine's MAC (<code>AA:BB:CC:DD:EE:FF</code>), then press <b>⏻ Wake</b>. RC sends the standard magic packet and re-checks the status after 20, 45 and 90 seconds. Wake-on-LAN must be enabled in the machine's BIOS and network card, and you must be on the same network.</li>
+</ul>
+
+<h2 id="terminal">The SSH terminal</h2>
+<p>The in-app terminal is a real terminal emulator, so programs that take over the screen work: <b>vim, nano, htop, top, less, mc, tmux</b>. When you quit them your shell screen returns exactly as you left it.</p>
+<figure class="shot"><img src="assets/m04_ssh_terminal.png" alt="SSH terminal" loading="lazy"><figcaption>An SSH terminal tab. The toolbar has Snippets, Find, Log to file, Record, Broadcast, ⚡ Quick and text-size buttons.</figcaption></figure>
+<ul>
+<li><b>Text size:</b> <kbd>Ctrl</kbd> + mouse wheel, or <b>A−</b> / <b>A+</b>. Remembered.</li>
+<li><b>Scrollback:</b> 10,000 lines by default (right-click &gt; <em>Scrollback</em> for 2,000 / 10,000 / 50,000). <b>Find</b> searches it too.</li>
+<li><b>Reconnect:</b> if the connection drops (Wi-Fi blip, reboot, VPN) the tab says so and retries on its own after 2, 4, 8, 15, 30, 30, 60 and 60 seconds, keeping your scrollback and giving you a fresh shell. <b>⟳ Reconnect</b> tries at once. If you typed <code>exit</code> or the login was refused it does <em>not</em> retry, so a wrong password cannot lock an account.</li>
+<li><b>Copy and paste:</b> right-click, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <kbd>Shift</kbd>+<kbd>Insert</kbd>. Pasting several lines first asks "Paste N lines?" because Enter inside the text would run each line.</li>
+<li><b>Keys:</b> function keys, <kbd>Alt</kbd>+key, <kbd>Shift</kbd>+<kbd>Tab</kbd>, Home / End / Page keys and application-cursor mode all work.</li>
+<li><b>Log to file</b> saves the session (without colour codes) in the <code>logs</code> folder.</li>
+</ul>
+<h3 id="term-look">Colours, font and clipboard</h3>
+<p>Right-click a terminal (or use the <em>View</em> menu) for <b>Colours</b> (Dark, Light, Solarized Dark, Dracula, Monokai, Nord, Gruvbox Dark, Green on black), <b>Font…</b> (fixed-width fonts, with a sample), <b>Copy when I select text</b>, <b>Right-click pastes (no menu)</b>, <b>Middle-click pastes</b> and <b>Save output to a file…</b>. Settings live in <code>terminal.json</code>.</p>
+<h3 id="quick-panel">⚡ Quick commands and History</h3>
+<figure class="shot"><img src="assets/m05_quick_panel.png" alt="Quick commands panel" loading="lazy"><figcaption>The ⚡ Quick panel beside a terminal: Commands and History.</figcaption></figure>
+<ul>
+<li><b>Commands</b> are your snippets, optionally in Groups. <b>Double-click or Paste</b> types the command <em>without</em> Enter so you can check it; <b>▶ Run</b> types it and presses Enter (asking first if the snippet says so); <b>Copy</b> copies it.</li>
+<li><b>History</b> lists commands you typed, newest first with a count and a search box. Run, Paste, Copy, <b>Save as command…</b>, Delete, Clear all. It is stored on this PC only (<code>history.json</code>) and can be switched off.</li>
+<li><b>Never recorded:</b> anything typed at a password / passphrase / code / PIN prompt, anything typed inside full-screen programs, lines you edited with arrow keys or Tab, and lines starting with a space (start a command with a space to keep it out).</li>
+</ul>
+<h3 id="after-login">After-login scripts</h3>
+<p>On a server's <em>After login</em> page, write one step per line as <code>wait-for-text =&gt; what to type</code>. After every connect RC watches the output and, when the text appears (case does not matter), types the reply and presses Enter. Example for a box where you always want root:</p>
+<pre><code>$ =&gt; sudo -i
+assword =&gt; ${password}
+# =&gt; cd /var/log</code></pre>
+<p><code>${user}</code>, <code>${host}</code> and <code>${password}</code> are filled in (the password is never written to the log), <code>//</code> starts a comment, and an empty wait types after a short pause. If a step does not appear within 10 seconds the script stops and says so. It runs again after an automatic reconnect.</p>
+<h3 id="zmodem">Zmodem: sz and rz in the terminal</h3>
+<p>Servers with <code>lrzsz</code> installed (<code>apt install lrzsz</code>) can move files through the terminal itself.</p>
+<ul>
+<li><b>Download:</b> run <code>sz somefile</code> on the server. RC asks once for a folder to save into (change it later from the right-click menu) and never overwrites: an existing name gets <code>(copy)</code>.</li>
+<li><b>Upload:</b> run <code>rz</code> on the server, or right-click the terminal &gt; <em>Upload files with Zmodem</em>.</li>
+<li>Progress shows in the status bar, with a <b>✕ Cancel Zmodem</b> button while it runs. Works in SSH terminals only.</li>
+</ul>
+<h3 id="telnet-serial">Telnet and Serial (COM port)</h3>
+<p>For switches, routers, UPSes and other gear without SSH. Add a connection of type <b>Telnet</b> or <b>Serial (COM port)</b> under <em>More connections</em> and a button appears for that server. They open the same terminal tab, so Find, logging, colours, Broadcast and after-login scripts all work.</p>
+<ul>
+<li><b>Telnet</b> defaults to port 23 and sends everything, passwords included, unencrypted: use it only on trusted networks. For the login use After login: <code>login: =&gt; ${user}</code> then <code>assword: =&gt; ${password}</code>.</li>
+<li><b>Serial:</b> put the settings in the address box: <code>COM3</code> or <code>COM3, 115200, 8N1, rtscts</code> (speed, data bits / parity / stop bits, then <code>rtscts</code> or <code>xonxoff</code>). <em>Tools &gt; Network &gt; Serial ports on this PC</em> lists what is plugged in. A device reached only by cable still needs an address: type <code>localhost</code>.</li>
+</ul>
+<h3 id="record">Recording and playback</h3>
+<p>Tick <b>⏺ Record</b> on any terminal tab to save what the server sends, with its timing, as a <code>.cast</code> file in the <code>recordings</code> folder (standard asciicast v2, so it also plays in asciinema tools). Untick it or close the tab to finish. <em>Tools &gt; Play a terminal recording…</em> opens a player with Play / Pause, Restart, speed (0.5x to 8x), <b>Skip long pauses</b> and a slider to jump anywhere.</p>
+<figure class="shot"><img src="assets/m19_recording_player.png" alt="Recording player" loading="lazy"><figcaption>The recording player.</figcaption></figure>
+<div class="warn"><b>Treat recordings like logs.</b> They show everything that was on the screen and may contain secrets. Only the server's output is recorded, not your keystrokes.</div>
+
+<h2 id="split">Split view, broadcast and workspaces</h2>
+<figure class="shot"><img src="assets/m06_split_view.png" alt="Split view" loading="lazy"><figcaption>Split view: four servers in one tab.</figcaption></figure>
+<ul>
+<li><b>Split view:</b> <em>Session &gt; New split view</em> opens one tab that tiles up to 9 terminals (Grid, Side by side or Stacked from the <b>Layout</b> button). <b>➕ Add server</b> puts a server in a pane; <em>Session &gt; Open selected server in a split view</em> does the same from the list. Double-click a pane's title (or ⛶) to zoom it; ✕ closes it. Every pane is a normal terminal with its own reconnect, Find and scrollback.</li>
+<li><b>Broadcast:</b> tick <b>📡 Type in ALL panes</b> (or <em>Session &gt; Broadcast</em>) and what you type or paste in one pane goes to all of them, including ordinary tabs you ticked. RC asks once before first use. Enter is sent too, so be careful.</li>
+<li><b>Workspaces:</b> <b>💾 Save workspace</b> stores the servers and layout under a name. <em>Session &gt; Open workspace</em> reopens it in one click. <em>Manage workspaces…</em> renames or deletes them (<code>workspaces.json</code>).</li>
+</ul>
+<figure class="shot"><img src="assets/m06_broadcast.png" alt="Broadcast on" loading="lazy"><figcaption>Broadcast on: every pane receives what you type.</figcaption></figure>
+
+<h2 id="files">File manager</h2>
+<p>Modelled on WinSCP's Commander layout: this PC on the left, the server on the right.</p>
+<figure class="shot"><img src="assets/m07_file_manager.png" alt="File manager" loading="lazy"><figcaption>The two-pane file manager with the transfer queue at the bottom.</figcaption></figure>
+<ul>
+<li><b>Copy files:</b> drag and drop between panes (drop on a folder row to go inside), or use the buttons / keys: <kbd>F5</kbd> copy, <kbd>F6</kbd> move, <kbd>F7</kbd> new folder, <kbd>F8</kbd> delete, <kbd>F2</kbd> rename, <kbd>F4</kbd> edit.</li>
+<li><b>Transfer queue:</b> progress bars, cancel one or all, <b>⏸ Pause</b> / <b>▶ Resume</b> and <b>↻ Retry failed</b>, on its own connection so you can keep browsing. If a file already exists choose overwrite if newer (default), overwrite, skip or ask. Copies keep timestamps, so unchanged files are skipped the second time.</li>
+<li><b>Synchronize…:</b> compares a folder on this PC with one on the server and updates either side (or both, newer wins). <b>Preview changes</b> shows a checklist first; untick anything you do not want, then <b>Apply</b>. Deleting target-only files is off by default and asks first.</li>
+<li><b>Edit (F4)</b> opens the built-in editor; <kbd>Ctrl</kbd>+<kbd>S</kbd> saves straight back to the server. <b>Open</b> hands the file to the Windows program for its type and uploads it again every time you save.</li>
+<li><b>Right-click menu:</b> Edit / Open, Copy or Move across, <b>Copy, Cut, Paste here</b> (on the server a copy runs <code>cp -a</code> on the server itself, so nothing travels through your PC), Rename, New folder, New file, Delete, Properties (change permissions, octal like 755), Copy path, <b>Type path into the SSH terminal</b>, Select all, show hidden files, Refresh.</li>
+<li><b>Navigation:</b> a clickable path trail, click a column heading to sort, a filter box per pane, back / forward / up, <b>★ bookmarks</b> per server, and RC reopens the last folder you were in.</li>
+<li>FTPS accepts self-signed certificates (usual on home servers) and supports port 990. Plain FTP sends the password unencrypted: prefer SFTP or FTPS.</li>
+</ul>
+
+<h2 id="stats">Live stats</h2>
+<p>Click <b>📊 Stats</b> to watch a server. RC logs in over SSH with the saved login or key and refreshes every 2, 5 (default), 10, 30 or 60 seconds. Nothing is installed or changed on the server: one read-only script reads <code>/proc</code>, <code>df</code>, <code>ps</code> and <code>ss</code>.</p>
+<figure class="shot"><img src="assets/m08_stats.png" alt="Stats tab" loading="lazy"><figcaption>Stats for a Docker host. (Sample numbers in this picture.)</figcaption></figure>
+<ul>
+<li><b>Tiles:</b> CPU % with a graph (cores and load average), memory and swap, network download / upload, and system and uptime.</li>
+<li><b>Processes:</b> click a column heading to sort, type in the filter box; busy ones are tinted amber (40%+ CPU) or red (80%+). <b>Disks</b> tint at 80% and 90% full. <b>Listening ports</b> shows what the server is serving (program names appear with a root login).</li>
+<li><b>Process details and signals:</b> double-click a process (or <b>Details / send signal…</b>) to see its command line, working folder, memory, open files and disk I/O. Choose TERM (stop politely), HUP (reload), INT or KILL and click <b>Send…</b>. RC always asks first, with an extra warning for KILL. Other users' processes need root or passwordless sudo.</li>
+<li><b>Services</b> (systemd): every service with its state and whether it starts at boot, with a Running / Failed / Enabled switch. Select one and <b>Start, Stop, Restart, Enable at boot, Disable at boot</b> (confirmation first, with extra care for ssh / network services) or <b>Logs…</b> for the last 200 journal lines.</li>
+<li><b>System:</b> OS, kernel, CPU model, time zone, <b>clock difference from this PC</b> (flagged over a minute: a sign of broken NTP), every network interface with MAC, speed and addresses, and disks.</li>
+<li><b>Pause</b>, <b>⟳ Now</b> and the interval are at the top. If the link drops the tab reconnects by itself; if a server keeps refusing logins RC waits longer between tries (up to a minute) and says when it will try again.</li>
+<li>Works on Linux, Raspberry Pi, Synology / QNAP and other servers that have <code>/proc</code>. A Windows SSH server answers "not supported": use Glances (below), Remote Desktop or PowerShell there.</li>
+</ul>
+<h3 id="glances">Stats from Glances (PCs and servers with no SSH)</h3>
+<p>If a machine already runs <a href="https://nicolargo.github.io/glances">Glances</a> in web mode (<code>glances -w</code>, port 61208), open that server's <b>Glances</b> page and click <b>🔎 Detect / test Glances</b>. RC finds it and ticks <em>Use Glances for this server's Stats</em> itself. The Stats tab then reads Glances' REST API, so it works for <b>Windows PCs and devices you have no SSH login for</b>. You also get a <b>Containers</b> tab (Docker / Podman) and temperature sensors. Not available in this mode: sending signals, the Services list and the Listening ports list. Set the port, a username and password (if Glances was started with <code>--password</code>) and https (if started with <code>--enable-https</code>; self-signed certificates are accepted).</p>
+
+<h2 id="network">Network tools</h2>
+<h3 id="netscan">Network scan</h3>
+<p><em>Tools &gt; Network &gt; Network scan</em> finds the machines on a network and what they offer.</p>
+<figure class="shot"><img src="assets/m09_network_scan.png" alt="Network scan" loading="lazy"><figcaption>The Network scan lists machines, names, MAC addresses and open ports. (Sample data.)</figcaption></figure>
+<ol class="steps">
+<li>Type a network (<code>192.168.1.0/24</code>, filled in with your own /24) or a range (<code>192.168.1.10-50</code>).</li>
+<li>Choose ports: <code>common</code> (25 usual ones), a list like <code>22,80,443</code>, or a range like <code>1-1024</code>.</li>
+<li>Click <b>▶ Scan</b>. Every address is tried with plain TCP connections (a "refused" answer also proves a machine is there). Machines appear as they are found, then names (reverse DNS) and MAC addresses (from your PC's ARP table) are filled in.</li>
+<li>Double-click a machine, or <b>➕ Add as server…</b>, to open the Add form prefilled with its name, address, MAC and a sensible double-click action. Machines already in RC are marked ✔.</li>
+</ol>
+<ul>
+<li><b>Deep scan:</b> select a machine and click <b>Scan more ports on this machine…</b>. Type a range such as <code>1-1024</code>, or <code>all</code> to try every port from 1 to 65535 (about two minutes; it shows progress, and <b>■ Stop</b> ends it early but keeps what it found). <code>all</code> works on one machine only, never on a whole network.</li>
+<li><b>Copy</b> and <b>Export CSV…</b> save the list; click a heading to sort. At most 1,024 addresses per scan.</li>
+</ul>
+<div class="warn"><b>Scan only networks you are allowed to scan.</b> RC makes plain connections only and installs nothing anywhere.</div>
+<h3 id="tunnels">SSH tunnels</h3>
+<p><em>Tools &gt; Network &gt; SSH tunnels</em> (or the Tunnels button). Three kinds: <b>Local</b> (a port on this PC reaches a service behind the server), <b>Remote</b> (a port on the server reaches something on this PC) and <b>Dynamic</b> (a SOCKS5 proxy). Start and stop with one click; <b>Open in browser</b> for local ones.</p>
+<figure class="shot"><img src="assets/m16_tunnels.png" alt="Tunnels" loading="lazy"><figcaption>The Tunnels tab.</figcaption></figure>
+<p>Example: Local, listen <code>8081</code>, destination <code>10.0.0.20:5000</code> through your Linux box, then open <code>http://127.0.0.1:8081</code>. Tunnels use the server's saved login or key and stop when you close RC. They listen on 127.0.0.1 (this PC only) unless you type <code>0.0.0.0</code>, and RC asks before allowing that.</p>
+<h3 id="proxies">Proxies</h3>
+<p><em>Tools &gt; Network &gt; Proxies</em>. Add a <b>SOCKS5</b> or <b>HTTP (CONNECT)</b> proxy with an optional username and password, then pick it on a server's Network page under <b>Connect via proxy</b>. SSH terminals, SFTP, tunnels, Stats, snippets, key setup and the status dot all go through it. FTP / FTPS, Remote Desktop, VNC, web and ping do not use proxies. With SOCKS5 the proxy resolves the server's name itself. <b>✔ Test…</b> connects to a host:port through the proxy and shows what came back or exactly why not.</p>
+<figure class="shot"><img src="assets/m12_proxies.png" alt="Proxies" loading="lazy"><figcaption>The Proxies tab.</figcaption></figure>
+<h3 id="localsrv">Local servers (TFTP / HTTP)</h3>
+<p><em>Tools &gt; Network &gt; Local servers</em> starts a temporary server on this PC for devices that fetch files, such as a switch loading a config or firmware by TFTP. Pick a folder and a port, click <b>Start</b>, and the tab shows the addresses other devices should use and logs every request.</p>
+<figure class="shot"><img src="assets/m13_local_servers.png" alt="Local servers" loading="lazy"><figcaption>Local servers: TFTP and HTTP.</figcaption></figure>
+<ul>
+<li><b>TFTP</b> (port 69) is read-only unless <b>Allow uploads</b> is ticked (new files only unless <b>allow overwriting</b> is ticked too).</li>
+<li><b>HTTP</b> is read-only, with optional folder listings; uploads and deletes are refused.</li>
+<li>Both refuse anything outside the chosen folder, stop by themselves after N minutes (default 30) and stop when RC closes. While one runs, anyone on your network can read that folder: serve only what you mean to share. Windows may ask to allow the program through its firewall.</li>
+</ul>
+<h3 id="serial-ports">Serial ports on this PC</h3>
+<p><em>Tools &gt; Network &gt; Serial ports on this PC…</em> lists the COM ports that are plugged in, to help you fill in a Serial connection.</p>
+
+<h2 id="credentials">Logins and credentials</h2>
+<h3 id="saved-logins">Saved logins</h3>
+<p>Fill in <b>Username</b> and <b>Password</b> on a server's Login page and click Save: from then on every connection uses them with no prompt. Extra connections can have their own. Prefer not to save anything? Leave Password empty and RC asks when you connect (with a <em>Remember</em> box).</p>
+<ul>
+<li><b>Where it is kept:</b> in <code>hosts.json</code>, encrypted with Windows' own protection (DPAPI) tied to <em>your Windows account on this PC</em>. The file is useless on another PC or user, and a password never appears in it as text. (That is why <a href="#backup">Backup</a> exists.)</li>
+<li><b>On screen:</b> dots, with a <em>Show</em> box while you type. A saved password is never shown again: leave the box empty to keep it, type to replace it, or tick <em>forget</em>.</li>
+<li><b>Keys are better where they work</b> (an SSH key file or ssh-agent): then nothing needs saving. For a key with a passphrase put the passphrase in the Password box.</li>
+<li>Anyone who can sign in to your Windows account can use your saved logins, as with any saved-password feature. Lock your PC.</li>
+</ul>
+<h3 id="identities">Identities</h3>
+<p><em>Tools &gt; Credentials &gt; Identities</em>. An identity is a reusable login: a name, a username and either a password, a key file, or "SSH agent / default keys". Pick it on a server's Login page under <b>Saved login (identity)</b>. That server then uses the identity <em>instead of</em> its own username and password, so changing a password once changes it for every server that uses it. Deleting an identity sends its servers back to their own settings.</p>
+<figure class="shot"><img src="assets/m11_identities.png" alt="Identities" loading="lazy"><figcaption>The Identities tab.</figcaption></figure>
+<h3 id="keys">One-click keys for the whole lab</h3>
+<p><em>Tools &gt; Credentials &gt; Set up keys for all servers</em> (or the 🔑 Keys button) creates one ed25519 key for <em>this PC</em>, with no passphrase and no expiry, and installs it on every server you tick. Type each password once; RC installs the public key (Linux, Synology, routers with Dropbear, Windows OpenSSH), tests a key-only login and remembers the key for that server. Servers that already accept the key are skipped. Using a second PC? Run Keys there too: each PC gets its own key and no private key is ever copied between machines.</p>
+<figure class="shot"><img src="assets/m17_keys.png" alt="Keys tab" loading="lazy"><figcaption>The Keys tab.</figcaption></figure>
+<h3 id="hostkeys">Trusted host keys</h3>
+<p>The first time you reach an SSH / SFTP server you are shown its key fingerprint and asked to trust it. If the key later <b>changes</b>, RC refuses to connect and warns you. <em>Tools &gt; Credentials &gt; Trusted host keys</em> lists every trusted key; if a server was rebuilt, select it and click <b>Forget</b>, and the next connection asks you to trust the new key.</p>
+<figure class="shot"><img src="assets/m18_known_hosts.png" alt="Trusted host keys" loading="lazy"><figcaption>Trusted host keys.</figcaption></figure>
+<p><em>Tools &gt; Credentials &gt; Forget ALL saved passwords…</em> wipes every saved password after asking.</p>
+
+<h2 id="tools">Snippets, notes and history</h2>
+<h3 id="snippets">Snippets (saved commands)</h3>
+<p><em>Tools &gt; Snippets</em>. Save a command once and <b>run it on any servers you pick</b> (or a whole group): RC connects to each with its saved login or key and shows the result per server. Snippets can have a Group, and a snippet can be marked "confirm first". In a terminal the <b>Snippets</b> menu types one into the session.</p>
+<figure class="shot"><img src="assets/m15_snippets.png" alt="Snippets" loading="lazy"><figcaption>Snippets: saved commands run on many servers.</figcaption></figure>
+<h3 id="notes">Notes</h3>
+<p><em>Tools &gt; Notes</em>, or right-click a server &gt; <em>Notes…</em>. Free-form notes with <b>tags</b>, optionally attached to a <b>server</b>: rack positions, which switch port goes where, "how I fixed it last time". Search matches title, text and tags; filter by tag or server. Write in Markdown (<code># heading</code>, <code>- bullet</code>, <code>**bold**</code>, backticks for code) and tick <b>Preview</b> to see it formatted. Notes save as you type and are included in Backup.</p>
+<figure class="shot"><img src="assets/m10_notes.png" alt="Notes" loading="lazy"><figcaption>Notes with tags, attached to servers.</figcaption></figure>
+
+<h2 id="backup">Backup, restore and moving to a new PC</h2>
+<p>Saved passwords are locked to one Windows account on one PC, so simply copying <code>hosts.json</code> to another PC loses them. <b>Backup</b> solves that.</p>
+<ol class="steps">
+<li><b>On the old PC:</b> <em>File &gt; Backup &gt; Back up everything (encrypted)…</em>. Choose a password (at least 8 characters; it <b>cannot be recovered</b>), type it again, and choose where to save the <code>.rcbackup</code> file.</li>
+<li><b>Move the file</b> to the new PC by USB stick, network share or cloud.</li>
+<li><b>On the new PC:</b> <em>File &gt; Backup &gt; Restore from a backup…</em>, pick the file and enter the password. Choose whether to <em>add what is missing and overwrite matching servers</em> or <em>only add what is missing</em>.</li>
+</ol>
+<figure class="shot"><img src="assets/m21_backup_password.png" alt="Backup password prompt" loading="lazy"><figcaption>The backup asks for a password of your choice. The file is locked with it (scrypt + AES-256-GCM).</figcaption></figure>
+<ul>
+<li><b>Included:</b> servers (with extra connections, tunnels, bookmarks and saved passwords), snippets, workspaces, identities, proxies, notes and trusted host keys. Passwords are re-encrypted for the new PC and account on restore.</li>
+<li><b>Not included:</b> SSH key <em>files</em> (copy your <code>~\.ssh</code> folder yourself; RC tells you how many servers use one), command history and settings.</li>
+<li>A safety copy of your server list is saved first (<code>hosts.json.before-restore-&lt;time&gt;</code>).</li>
+</ul>
+<div class="tip"><b>Simplest alternative:</b> RC keeps all its data next to <code>RC.exe</code>, so copying the whole folder to a USB stick also works for everything except saved passwords.</div>
+
+<h2 id="look">Themes, preferences and shortcuts</h2>
+<h3 id="themes">Colour themes</h3>
+<p>Seven themes: <b>Sky Blue</b> (default), <b>Sunset</b>, <b>Mint Fresh</b>, <b>Royal Dark</b>, <b>Neon Purple</b>, <b>Classic Dark</b> and <b>Classic Light</b>. Click the 🎨 button at the top right to cycle, or pick one under <em>View &gt; Color theme</em>. The choice is remembered. The terminal keeps its own colours in every theme.</p>
+<div class="twin">
+<figure class="shot"><img src="assets/m23_theme_royal_dark.png" alt="Royal Dark theme" loading="lazy"><figcaption>Royal Dark</figcaption></figure>
+<figure class="shot"><img src="assets/m23_theme_neon_purple.png" alt="Neon Purple theme" loading="lazy"><figcaption>Neon Purple</figcaption></figure>
+</div>
+<h3 id="prefs">Preferences</h3>
+<p><em>Tools &gt; Preferences</em> (saved in <code>prefs.json</code>, applied at once):</p>
+<figure class="shot"><img src="assets/m14_preferences.png" alt="Preferences" loading="lazy"><figcaption>Preferences, with the list of keyboard shortcuts.</figcaption></figure>
+<ul>
+<li>Ask before closing RC while sessions are open or files are transferring (on by default).</li>
+<li>Reopen my SSH / Files / Stats tabs from last time when RC starts (off by default).</li>
+<li>How often the server list checks whether each server is up (off, 30 s, 1 / 5 / 15 min).</li>
+<li>The refresh interval for new Stats tabs.</li>
+<li><b>Interface size</b>, 80% to 200%.</li>
+</ul>
+<h3 id="shortcuts">Keyboard shortcuts</h3>
+<table>
+<tr><th>Keys</th><th>What it does</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Quick connect</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>Add a server</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Disconnect (close) this tab. Middle-click a tab does the same.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>1</kbd> … <kbd>9</kbd></td><td>Go to tab 1 … 9 (9 = the last tab)</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next / previous tab</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd></td><td>Duplicate the terminal session</td></tr>
+<tr><td><kbd>Ctrl</kbd> + mouse wheel (terminal)</td><td>Text size</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Copy / paste in a terminal (also <kbd>Shift</kbd>+<kbd>Insert</kbd>)</td></tr>
+<tr><td><kbd>F5</kbd> <kbd>F6</kbd> <kbd>F7</kbd> <kbd>F8</kbd> <kbd>F2</kbd> <kbd>F4</kbd> (file manager)</td><td>Copy, move, new folder, delete, rename, edit</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd> (file manager)</td><td>Select all, copy, cut, paste here</td></tr>
+</table>
+<p>These shortcuts work while you type in a terminal and are not sent to the server.</p>
+
+<h2 id="menus">Menu reference</h2>
+<p>Every item in the menu bar, left to right.</p>
+<div class="menuref">
+<h3>File</h3>
+<figure class="shot"><img src="assets/menu_file.png" alt="File menu" loading="lazy"><figcaption>The File menu: everything about the server list.</figcaption></figure>
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td>Add server… (<kbd>Ctrl</kbd>+<kbd>N</kbd>)</td><td>Opens the Add form in a tab. See <a href="#add">Adding servers</a>.</td></tr>
+<tr><td>Edit selected server…</td><td>Opens the same form for the selected server.</td></tr>
+<tr><td>Duplicate selected server</td><td>Copies a server so you can change a few fields.</td></tr>
+<tr><td>Delete selected server</td><td>Removes it from RC (asks first). The real machine is not touched.</td></tr>
+<tr><td>★ Add / remove favourite</td><td>Pins the server to the top and the Overview.</td></tr>
+<tr><td>Copy address</td><td>Puts the server's address on the clipboard.</td></tr>
+<tr><td>Import servers ▸</td><td>From a CSV / text file, PuTTY / WinSCP / ssh config, MobaXterm, or Xshell.</td></tr>
+<tr><td>Export servers to a CSV file…</td><td>Names, addresses, groups and users only. Never passwords.</td></tr>
+<tr><td>Backup ▸</td><td><em>Back up everything (encrypted)…</em> and <em>Restore from a backup…</em>. See <a href="#backup">Backup</a>.</td></tr>
+<tr><td>Disconnect current tab (<kbd>Ctrl</kbd>+<kbd>W</kbd>)</td><td>Closes the selected tab and its connection.</td></tr>
+<tr><td>Disconnect all</td><td>Closes every session tab (locked tabs stay).</td></tr>
+<tr><td>Exit</td><td>Closes RC; asks first if sessions are open or files are transferring.</td></tr>
+</table>
+<h3>Connect</h3>
+<figure class="shot"><img src="assets/menu_connect.png" alt="Connect menu" loading="lazy"><figcaption>The Connect menu: the same actions as the buttons on a server's page.</figcaption></figure>
+<p>One item per connection type for the selected server: SSH (in app), Files, Live stats, Remote Desktop, VNC, RustDesk, Web, PowerShell (remote), SSH (separate window), Mail, Network share, Ping, Wake-on-LAN and Check this server. See <a href="#connect">Connecting</a>.</p>
+<h3>Servers</h3>
+<figure class="shot"><img src="assets/menu_servers.png" alt="Servers menu" loading="lazy"><figcaption>The Servers menu: group, then server, then how to connect.</figcaption></figure>
+<p>Every server, grouped, with every connection it has (including extras). Handy when you like menus better than the list.</p>
+<h3>Session</h3>
+<figure class="shot"><img src="assets/menu_session.png" alt="Session menu" loading="lazy"><figcaption>The Session menu.</figcaption></figure>
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td>New split view</td><td>An empty tab for several terminals.</td></tr>
+<tr><td>Open selected server in a split view</td><td>Adds the selected server as a pane.</td></tr>
+<tr><td>💾 Save this split view as a workspace…</td><td>Stores its servers and layout under a name.</td></tr>
+<tr><td>Open workspace ▸ / Manage workspaces…</td><td>Reopen, rename or delete saved workspaces.</td></tr>
+<tr><td>Duplicate this session</td><td>Opens another terminal to the same server (also <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>).</td></tr>
+<tr><td>Rename this tab…</td><td>Gives the tab your own title.</td></tr>
+<tr><td>🔒 Lock / unlock this tab</td><td>A locked tab will not close by accident.</td></tr>
+<tr><td>Close other tabs</td><td>Closes every tab except this one and locked ones.</td></tr>
+<tr><td>📡 Broadcast / Stop broadcasting</td><td>Type in all open terminals at once, or stop.</td></tr>
+</table>
+<h3>View</h3>
+<figure class="shot"><img src="assets/menu_view.png" alt="View menu" loading="lazy"><figcaption>The View menu.</figcaption></figure>
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td>🏠 Overview</td><td>Back to the Overview tab.</td></tr>
+<tr><td>⟳ Check all servers now</td><td>Re-checks every status dot immediately.</td></tr>
+<tr><td>🎨 Color theme ▸</td><td>Pick one of seven themes.</td></tr>
+<tr><td>Terminal text size ▸</td><td>Bigger, smaller or reset.</td></tr>
+<tr><td>Terminal colours ▸</td><td>Eight terminal colour schemes.</td></tr>
+<tr><td>Terminal font…</td><td>Choose the terminal's fixed-width font.</td></tr>
+</table>
+<h3>Tools</h3>
+<figure class="shot"><img src="assets/menu_tools.png" alt="Tools menu" loading="lazy"><figcaption>The Tools menu groups Network and Credentials.</figcaption></figure>
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td>Quick connect… (<kbd>Ctrl</kbd>+<kbd>K</kbd>)</td><td>The search box that opens anything.</td></tr>
+<tr><td>Snippets (saved commands)…</td><td>Save and run commands on many servers.</td></tr>
+<tr><td>Network ▸</td><td>SSH tunnels · 🌐 Proxies · Serial ports on this PC · 🔎 Network scan · Local servers (TFTP / HTTP) · Check all servers now.</td></tr>
+<tr><td>Credentials ▸</td><td>👤 Identities · 🔑 Set up keys for all servers · 🛡 Trusted host keys · Forget ALL saved passwords.</td></tr>
+<tr><td>⚙ Preferences…</td><td>Confirmations, reopening tabs, check timing, interface size.</td></tr>
+<tr><td>▶ Play a terminal recording…</td><td>Opens a recorded <code>.cast</code> session in the player.</td></tr>
+<tr><td>📝 Notes…</td><td>Tagged Markdown notes.</td></tr>
+<tr><td>📄 Open the log file</td><td>Opens <code>rc.log</code> in your text editor.</td></tr>
+</table>
+<h3>Help</h3>
+<figure class="shot"><img src="assets/menu_help.png" alt="Help menu" loading="lazy"><figcaption>The Help menu.</figcaption></figure>
+<table>
+<tr><th>Item</th><th>What it does</th></tr>
+<tr><td>📖 Manual (web page)</td><td>Opens this manual.</td></tr>
+<tr><td>Quick start guide (README)</td><td>Shows the README as a formatted page in your browser.</td></tr>
+<tr><td>Keyboard shortcuts</td><td>A short list of the main keys.</td></tr>
+<tr><td>ℹ About REGTeches RC</td><td>Version, author and links.</td></tr>
+</table>
+</div>
+<h3 id="rightclick">Right-click menus</h3>
+<ul>
+<li><b>A server in the list:</b> its default action first, then Edit, Duplicate, Favourite, Notes…, and a <b>More</b> submenu with the less-used connections (ping, wake, mail, shares…).</li>
+<li><b>A tab:</b> Duplicate, Rename, Lock, Close, Close others / to the right / to the left.</li>
+<li><b>A terminal:</b> Copy, Paste, Colours, Font, Scrollback, Copy on select, Zmodem, Clear screen (keep scrollback), Save output to a file…</li>
+<li><b>A file:</b> see <a href="#files">File manager</a>.</li>
+</ul>
+
+<h2 id="data">Where RC keeps things</h2>
+<p>All data lives in the folder that holds <code>RC.exe</code> (or the Scoop persist folder, or the folder named by the <code>RC_DATA_DIR</code> environment variable). Back these up to keep your setup; never publish them.</p>
+<table>
+<tr><th>File or folder</th><th>Holds</th></tr>
+<tr><td><code>hosts.json</code></td><td>Your servers, with saved passwords encrypted for your Windows account</td></tr>
+<tr><td><code>known_hosts</code></td><td>Trusted SSH host keys</td></tr>
+<tr><td><code>settings.json</code>, <code>terminal.json</code>, <code>prefs.json</code></td><td>Theme, terminal look, preferences</td></tr>
+<tr><td><code>snippets.json</code>, <code>history.json</code>, <code>notes.json</code></td><td>Saved commands, command history, notes</td></tr>
+<tr><td><code>identities.json</code>, <code>proxies.json</code>, <code>workspaces.json</code></td><td>Shared logins, proxies, split-view layouts</td></tr>
+<tr><td><code>recordings\</code>, <code>logs\</code></td><td>Terminal recordings and session logs</td></tr>
+<tr><td><code>rc.log</code></td><td>What RC did and any problems (never passwords). Rotated at 512 KB.</td></tr>
+</table>
+<p>A damaged <code>hosts.json</code> is never overwritten: RC moves it aside as <code>hosts.json.corrupt-&lt;time&gt;</code> and starts empty, so a typo cannot wipe your list. Bad values (like a port that is not 1-65535) are repaired and noted in the log.</p>
+
+<h2 id="faq">Help &amp; FAQ</h2>
+<h3>A server shows a red dot but I know it is on.</h3>
+<p>RC tries the SSH port, the Remote Desktop port, then a ping. A machine with a firewall that blocks all three, or one only reachable through a proxy or jump server, may look down. Give it a proxy or jump server on the Network page, add its other addresses, or click <b>✔ Check this server</b> to see exactly what answered. <em>Refused</em> means nothing is listening (fine if you do not use that service); <em>no answer</em> means a firewall dropped it or the machine is off.</p>
+<h3>"Host key changed" and the connection is refused.</h3>
+<p>The server was rebuilt or something is intercepting the connection. If you know it was rebuilt, open <em>Tools &gt; Credentials &gt; Trusted host keys</em>, select the server and click <b>Forget</b>. The next connection asks you to trust the new key.</p>
+<h3>My saved passwords vanished after moving to a new PC.</h3>
+<p>They are locked to the old Windows account. Use <a href="#backup">Backup and Restore</a> to carry them over, or enter each password once (or set up keys).</p>
+<h3>RC reconnects forever / not at all.</h3>
+<p>A dropped connection retries on a schedule (2, 4, 8, 15, 30, 30, 60, 60 seconds). A clean <code>exit</code>, or a refused login, never retries, so a wrong password cannot lock an account. Press <b>⟳ Reconnect</b> to try at once.</p>
+<h3>Remote PowerShell says the server is not trusted.</h3>
+<p>For a machine outside your domain add it to TrustedHosts, as Administrator: <code>Set-Item WSMan:\localhost\Client\TrustedHosts -Value &lt;address&gt;</code>.</p>
+<h3>VNC or RustDesk says it cannot find the program.</h3>
+<p>Install the viewer, or tell RC where it is by adding <code>vnc_viewer</code> or <code>rustdesk_path</code> to <code>settings.json</code>.</p>
+<h3>Where is the log?</h3>
+<p><em>Tools &gt; 📄 Open the log file</em>. It is <code>rc.log</code> next to <code>hosts.json</code>. Set the environment variable <code>RC_LOG_LEVEL=DEBUG</code> before starting RC for more detail. Send the log along when asking for help. It never contains passwords.</p>
+<h3>Limits</h3>
+<ul>
+<li>The terminal does not send mouse events to programs and does not show sixel / image output. Wide (CJK / emoji) characters line up approximately.</li>
+<li>Without a saved login, Remote Desktop asks for the password in the normal Windows window.</li>
+<li>Windows only.</li>
+</ul>
+<h3>Security notes</h3>
+<ul>
+<li>Plain FTP and Telnet send passwords unencrypted. Use SFTP / FTPS / SSH wherever the server offers them.</li>
+<li>FTPS ignores certificate errors, because home servers usually use self-signed certificates.</li>
+<li>Recordings and logs may contain sensitive text; treat them like passwords.</li>
+<li>Keep <code>hosts.json</code>, <code>known_hosts</code>, <code>identities.json</code>, <code>proxies.json</code>, <code>notes.json</code>, <code>rc.log</code> and your backups private.</li>
+</ul>
+
+<h2 id="download">Download and licence</h2>
+<p>RC is free and open source under the <b>MIT licence</b>. Copyright © 2026 Ronald Goodchild (REGTeches), Jacksonville, Florida.</p>
+<div class="cta">
+  <a class="btn" href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">⬇ Download RC 2.13.1 (zip)</a>
+  <a class="btn ghost" href="https://github.com/ronaldgoodchild/regteches-rc">View the source on GitHub</a>
+  <a class="btn ghost" href="https://github.com/ronaldgoodchild/regteches-rc/blob/main/CHANGELOG.md">What changed in each version</a>
+</div>
+<table>
+<tr><th>Option</th><th>Command or link</th></tr>
+<tr><td>Zip with <code>RC.exe</code></td><td><a href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">GitHub Releases</a></td></tr>
+<tr><td>Scoop</td><td><code>scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches</code> then <code>scoop install rc</code></td></tr>
+<tr><td>Source</td><td><code>pip install -r requirements.txt</code> then <code>python rc_manager.py</code></td></tr>
+</table>
+<p>Requirements for the source version: Python 3.11+, <code>paramiko</code> (SSH), <code>pyte</code> (terminal), <code>pyserial</code> (Serial), <code>cryptography</code>.</p>
+
+</article>
+</div>
+
+<footer class="foot">
+  <p><b>REGTeches RC</b> · Remote Connection Manager 2.13.1 · Developed by Ronald Goodchild · REGTeches, Jacksonville FL · MIT licence</p>
+  <p>All pictures and the video on this page use sample data. No real servers, addresses or logins are shown.</p>
+</footer>
+
+<button class="iconbtn" id="top" title="Back to top">↑</button>
+<div id="lb"><img alt=""><p></p></div>
+
+<script>
+(function(){
+  var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+  /* theme */
+  var root=document.documentElement;
+  try{var t=localStorage.getItem('rcdocs-theme'); if(t) root.setAttribute('data-theme',t); else if(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches) root.setAttribute('data-theme','light');}catch(e){}
+  $('#themeBtn').onclick=function(){var n=root.getAttribute('data-theme')==='light'?'dark':'light';root.setAttribute('data-theme',n);try{localStorage.setItem('rcdocs-theme',n)}catch(e){}};
+  /* mobile menus */
+  $('#navToggle').onclick=function(){var open=!$('#toc').classList.contains('open');$('#toc').classList.toggle('open',open);$('#mainNav').classList.toggle('open',open);};
+  /* gallery */
+  var G=[
+   ['m01_overview','The Overview','Live status dots, favourites, recents'],
+   ['m02_server_buttons','A server\'s page','Every way in, one click'],
+   ['m03_add_general','Add a server','A form with one page per topic'],
+   ['m04_ssh_terminal','SSH terminal','A real terminal tab'],
+   ['m05_quick_panel','Quick commands','Commands and history beside the terminal'],
+   ['m06_split_view','Split view','Four servers in one tab'],
+   ['m07_file_manager','File manager','Two panes, drag and drop, transfer queue'],
+   ['m08_stats','Live stats','CPU, memory, network, disks, processes'],
+   ['m09_network_scan','Network scan','Find machines and open ports'],
+   ['m10_notes','Notes','Markdown notes tied to servers'],
+   ['m11_identities','Identities','One login shared by many servers'],
+   ['m13_local_servers','Local servers','Temporary TFTP and HTTP servers'],
+   ['m16_tunnels','SSH tunnels','Local, remote and dynamic'],
+   ['m17_keys','Keys','Passwordless SSH for the whole lab'],
+   ['m14_preferences','Preferences','Confirmations, reopened tabs, timing'],
+   ['m23_theme_royal_dark','Royal Dark theme','One of seven themes'],
+   ['m23_theme_neon_purple','Neon Purple theme','Light, dark or neon']
+  ];
+  var grid=$('#galleryGrid');
+  G.forEach(function(g){var f=document.createElement('figure');f.innerHTML='<img loading="lazy" src="assets/'+g[0]+'.png" alt="'+g[1]+'"><figcaption><b>'+g[1]+'</b><span>'+g[2]+'</span></figcaption>';grid.appendChild(f);});
+  /* images that are missing are hidden instead of showing a broken icon */
+  $$('img').forEach(function(im){im.addEventListener('error',function(){var f=im.closest('figure');if(f)f.style.display='none';});});
+  /* lightbox */
+  var lb=$('#lb'),lbi=$('#lb img'),lbp=$('#lb p');
+  document.addEventListener('click',function(e){var im=e.target.closest&&e.target.closest('figure img');if(!im||im.closest('#lb'))return;lbi.src=im.src;lbi.alt=im.alt;lbp.textContent=im.alt;lb.classList.add('open');});
+  lb.onclick=function(){lb.classList.remove('open')};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')lb.classList.remove('open')});
+  /* table of contents from the manual headings */
+  var list=$('#tocList'),heads=$$('#doc h2, #doc h3[id]'),links=[];
+  heads.forEach(function(h){
+    var a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;a.className=h.tagName==='H2'?'h2':'h3';a.dataset.t=h.textContent.toLowerCase();
+    a.onclick=function(){$('#toc').classList.remove('open');$('#mainNav').classList.remove('open')};
+    list.appendChild(a);links.push({a:a,h:h});
+  });
+  /* search: filter the contents list and the text of the manual */
+  var search=$('#tocSearch');
+  search.addEventListener('input',function(){
+    var q=search.value.trim().toLowerCase();
+    var secs=$$('#doc > h2');
+    if(!q){links.forEach(function(l){l.a.classList.remove('hide')});$$('#doc > *').forEach(function(n){n.style.display=''});return;}
+    var cur=null,hit={};
+    // each section = an h2 plus everything until the next h2
+    var nodes=$$('#doc > *'),groups=[],g=null;
+    nodes.forEach(function(n){if(n.tagName==='H2'){g={h:n,items:[n]};groups.push(g);}else if(g){g.items.push(n);}});
+    groups.forEach(function(gr){
+      var text=gr.items.map(function(n){return n.textContent}).join(' ').toLowerCase();
+      var show=text.indexOf(q)>-1;
+      gr.items.forEach(function(n){n.style.display=show?'':'none'});
+      links.forEach(function(l){if(l.h===gr.h||gr.items.indexOf(l.h)>-1){l.a.classList.toggle('hide',!show);}});
+    });
+  });
+  /* scroll spy + back to top */
+  var topBtn=$('#top');topBtn.onclick=function(){window.scrollTo({top:0,behavior:'smooth'})};
+  var navLinks=$$('nav.main a');
+  function spy(){
+    var y=window.scrollY+110,cur=null;
+    links.forEach(function(l){if(l.h.getBoundingClientRect().top+window.scrollY<=y&&l.h.offsetParent!==null)cur=l;});
+    links.forEach(function(l){l.a.classList.toggle('on',l===cur)});
+    if(cur){var on=cur.a;var box=$('#toc');var r=on.getBoundingClientRect(),b=box.getBoundingClientRect();if(r.top<b.top+40||r.bottom>b.bottom-20)box.scrollTop+=r.top-b.top-80;}
+    topBtn.style.display=window.scrollY>700?'block':'none';
+    var secs=['features','video','gallery','manual','menus','shortcuts','faq','download'],act=null;
+    secs.forEach(function(id){var el=document.getElementById(id);if(el&&el.getBoundingClientRect().top<=140)act=id;});
+    navLinks.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+act)});
+  }
+  window.addEventListener('scroll',spy,{passive:true});spy();
+})();
+</script>
+</body>
+</html>
