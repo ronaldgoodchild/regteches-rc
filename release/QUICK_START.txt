@@ -33,18 +33,46 @@ STOP TYPING PASSWORDS: ONE-CLICK KEYS
   Keys tab once on that PC too: every PC gets its own key.
 
 MAKE IT YOURS
-  Tools > Color theme: seven themes (three light, two dark, two classic).
+  View > Color theme: seven themes (three light, two dark, two classic).
   The button at the top right cycles through them.
+  Tools > Preferences: ask before closing, reopen last session's tabs,
+  how often servers are checked, interface size.
+
+WHAT ELSE CAN IT DO?  (everything is in the menus)
+  Session      split view (several terminals in one tab), type once to
+               send to all of them (Broadcast), saved workspaces
+  Stats button live CPU, memory, disks, processes and services of a
+               server (Glances works for Windows PCs too)
+  Tools > Network
+               Network scan (find machines, deep scan of all ports),
+               SSH tunnels, proxies, TFTP / HTTP servers, serial ports
+  Tools > Credentials
+               identities (one login for many servers), one-click SSH
+               keys, trusted host keys
+  Tools        snippets (run a command on many servers), notes, play a
+               recorded terminal session, preferences
+  File         import from PuTTY, WinSCP, MobaXterm, Xshell or a CSV;
+               Backup = one password-locked file to move everything,
+               saved passwords included, to another PC
+  Terminal     right-click for colours, font, Zmodem and more; the
+               Quick button has your commands and history
 
 FILES THAT RC CREATES NEXT TO RC.EXE
   hosts.json     your servers (passwords are encrypted for your Windows
                  account, or use keys and store none)
   known_hosts    servers you chose to trust
-  settings.json  your colour theme
-  snippets.json  your saved commands
+  settings.json, terminal.json, prefs.json   look and preferences
+  snippets.json, history.json, notes.json    commands, history, notes
+  identities.json, proxies.json, workspaces.json
+  recordings, logs   terminal recordings and session logs
+  rc.log         what RC did (never passwords)
   Keep these private. Do not post them online.
 
-NEED THE FULL GUIDE?   Open README.md, or Help > Quick start guide.
+NEED MORE?
+  Help > Manual (web page)  - pictures, a video and a walk through every
+                              menu. Also in the "manual" folder: open
+                              manual\index.html.
+  Help > Quick start guide  - the README as a web page.
 
 REQUIREMENTS
   Windows 10 or 11. Remote Desktop and PowerShell buttons use the

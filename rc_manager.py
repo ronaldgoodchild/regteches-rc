@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.13.0"
+APP_VERSION = "2.13.1"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
@@ -2669,7 +2669,8 @@ class App:
         tools.add_command(label="📄 Open the log file", command=self.open_log)
         bar.add_cascade(label="Tools", menu=tools)
         help_m = tk.Menu(bar, tearoff=0)
-        help_m.add_command(label="\U0001f4d6 Quick start guide (README)", command=self.open_readme)
+        help_m.add_command(label="\U0001f4d6 Manual (web page)", command=self.open_manual)
+        help_m.add_command(label="Quick start guide (README)", command=self.open_readme)
         help_m.add_command(label="Keyboard shortcuts", command=self.show_shortcuts)
         help_m.add_command(label=f"ℹ About {COMPANY} RC", command=self.about)
         bar.add_cascade(label="Help", menu=help_m)
@@ -2967,6 +2968,21 @@ class App:
                         pass
         messagebox.showinfo("Quick start", "Add a server with the \u2795 Add button, pick it from the list, then click "
                             "how you want to connect (SSH, Files, Remote Desktop, Web ...).", parent=self.root)
+
+    MANUAL_URL = "https://ronaldgoodchild.github.io/regteches-rc/"
+
+    def open_manual(self):
+        """Help > Manual: the web manual (pictures, video, every menu explained). Opens the copy that ships next to the
+        program (manual/index.html, or docs/index.html when running from source); with none, the web address."""
+        for folder in ("manual", "docs"):
+            page = os.path.join(PROGRAM_DIR, folder, "index.html")
+            if os.path.isfile(page):
+                try:
+                    webbrowser.open("file:///" + page.replace(os.sep, "/"))
+                    return
+                except Exception:
+                    log.exception("Could not open the local manual")
+        webbrowser.open(self.MANUAL_URL)
 
     def about(self):
         win = tk.Toplevel(self.root)

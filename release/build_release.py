@@ -109,6 +109,11 @@ if MEDIA and os.path.isdir(MEDIA):
         if fn.lower().endswith((".png", ".gif", ".mp4")) and not fn.startswith("theme_"):
             shutil.copy(os.path.join(MEDIA, fn), shots)
 
+# the web manual (pictures, video, every menu explained): docs/ in the source becomes manual/ next to RC.exe
+docs_src = os.path.join(SRC, "docs")
+if os.path.isdir(docs_src):
+    shutil.copytree(docs_src, os.path.join(PKG, "manual"))
+
 # ─── safety: nothing personal may be in the package ─────────────────────────
 banned = ("hosts.json", "known_hosts", "settings.json", "snippets.json")
 for root_, _, files in os.walk(PKG):
@@ -116,9 +121,9 @@ for root_, _, files in os.walk(PKG):
         assert fn not in banned and not fn.endswith((".pem", ".ppk")) and "id_ed25519" not in fn, f"personal file in package: {fn}"
 for root_, _, files in os.walk(PKG):
     for fn in files:
-        if fn.endswith((".py", ".md", ".txt")):
+        if fn.endswith((".py", ".md", ".txt", ".html")):
             text = open(os.path.join(root_, fn), encoding="utf-8", errors="ignore").read()
-            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild(?!/(regteches-rc|scoop-regteches)\b)", r"tail4b8cdb"):  # RC's own public repo and bucket are fine; any other repo name is not
+            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild(?!(/|\.github\.io/)(regteches-rc|scoop-regteches)\b)", r"tail4b8cdb"):  # RC's own public repo and bucket are fine; any other repo name is not
                 assert not re.search(pat, text), f"private detail {pat} found in {fn}"
 
 # ─── zip ────────────────────────────────────────────────────────────────────
