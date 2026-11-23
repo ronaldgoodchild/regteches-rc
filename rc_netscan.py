@@ -84,11 +84,18 @@ def parse_targets(text):
     return out
 
 
-def parse_ports(text):
-    """'common', '22,80,8000-8100', '1-1024' -> sorted list of ports. Raises ValueError."""
+def parse_ports(text, allow_all=False):
+    """'common', '22,80,8000-8100', '1-1024' -> sorted list of ports. Raises ValueError.
+    'all' means every port, 1-65535, but only where allow_all is true (a single machine): a full sweep of a whole
+    network would be slow and noisy."""
     text = (text or "").strip().lower()
     if text in ("", "common"):
         return [p for p, _ in COMMON_PORTS]
+    if text in ("all", "full"):
+        if not allow_all:
+            raise ValueError("“all” (every port, 1-65535) is for one machine at a time: scan the network first, then pick "
+                             "a machine and use “Scan more ports on this machine…”.")
+        return list(range(1, 65536))
     ports = set()
     for part in [p for p in re.split(r"[,\s]+", text) if p]:
         m = re.fullmatch(r"(\d+)(?:-(\d+))?", part)
@@ -99,7 +106,7 @@ def parse_ports(text):
             raise ValueError(f"“{part}”: ports go from 1 to 65535.")
         ports.update(range(a, b + 1))
     if len(ports) > MAX_PORTS:
-        raise ValueError(f"That is {len(ports)} ports; scan at most {MAX_PORTS} at a time.")
+        raise ValueError(f"That is {len(ports)} ports; scan at most {MAX_PORTS} at a time (or type “all” for one machine).")
     return sorted(ports)
 
 
@@ -260,7 +267,7 @@ class NetScanTab(ttk.Frame):
         ttk.Label(top, text="e.g. 192.168.1.0/24   or   192.168.1.10-50", foreground="#555").grid(row=0, column=2, sticky="w")
         ttk.Label(top, text="Ports").grid(row=1, column=0, sticky="w", pady=4)
         ttk.Entry(top, textvariable=self.portsv, width=36).grid(row=1, column=1, sticky="w", padx=6)
-        ttk.Label(top, text="common   or   22,80,443   or   1-1024", foreground="#555").grid(row=1, column=2, sticky="w")
+        ttk.Label(top, text="common   or   22,80,443   or   1-1024   (all = every port, one machine only)", foreground="#555").grid(row=1, column=2, sticky="w")
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=6)
         self.go_btn = ttk.Button(bar, text="▶ Scan", command=self.start)
@@ -298,7 +305,7 @@ class NetScanTab(ttk.Frame):
             return
         try:
             ips = ips or parse_targets(self.target.get())
-            ports = ports or parse_ports(self.portsv.get())
+            ports = ports or parse_ports(self.portsv.get(), allow_all=len(ips) == 1)
         except ValueError as e:
             messagebox.showwarning("Network scan", str(e), parent=self)
             return
@@ -395,33 +402,56 @@ class NetScanTab(ttk.Frame):
         if not ip:
             messagebox.showinfo("Network scan", "Click a machine in the list first.", parent=self)
             return
-        text = simpledialog.askstring("Scan more ports", f"Ports to try on {ip}  (for example 1-1024 or 20-25,8000-9000):",
+        if self.job:
+            messagebox.showinfo("Network scan", "A scan is already running. Wait for it or press Stop.", parent=self)
+            return
+        text = simpledialog.askstring("Scan more ports", f"Ports to try on {ip}\n(for example 1-1024 or 20-25,8000-9000, or  all  for every port 1-65535):",
                                       initialvalue="1-1024", parent=self)
         if not text:
             return
         try:
-            ports = parse_ports(text)
+            ports = parse_ports(text, allow_all=True)
         except ValueError as e:
             messagebox.showwarning("Network scan", str(e), parent=self)
             return
+        big = len(ports) > MAX_PORTS
+        if big and not messagebox.askokcancel(
+                "Scan every port", f"Try all {len(ports)} ports on {ip}?\nThis can take a few minutes; press Stop to end it early. "
+                                   "Scan only machines you are allowed to scan.", parent=self):
+            return
         self.info.set(f"Scanning {len(ports)} port(s) on {ip} ...")
-        result = {}
+        self.go_btn.state(["disabled"])
+        self.stop_btn.state(["!disabled"])
+        self.progress["value"] = 0
+        self.started = time.time()
+        holder = {}
 
-        def on_host(i, up, found):
-            result["found"] = found
+        def progress(done, total):
+            self.app.post(lambda: self.deep_progress(ip, done, total))
 
         def done(stopped):
-            found = sorted(set(self.rows[ip]["ports"]) | set(result.get("found", [])))
-            self.app.post(lambda: self.deep_done(ip, found))
-        ScanJob([ip], ports, on_host, lambda d, t: None, done, workers=128, timeout=0.6).start()
+            found = sorted(set(self.rows[ip]["ports"]) | set(holder["job"].open[ip]))   # also what was found before a Stop
+            self.app.post(lambda: self.deep_done(ip, found, stopped))
+        holder["job"] = self.job = ScanJob([ip], ports, lambda *a: None, progress, done,
+                                           workers=300 if big else 128, timeout=0.6)
+        self.job.start()
 
-    def deep_done(self, ip, found):
+    def deep_progress(self, ip, done, total):
+        if not self.winfo_exists() or not self.job:
+            return
+        self.progress.configure(value=100.0 * done / max(1, total))
+        self.info.set(f"{ip}: {done} of {total} ports tried ...")
+
+    def deep_done(self, ip, found, stopped=False):
         if not self.winfo_exists():
             return
+        self.job = None
+        self.go_btn.state(["!disabled"])
+        self.stop_btn.state(["disabled"])
         row = self.rows[ip]
         row["ports"] = found
         self.tree.item(ip, values=(ip, row["name"], row["mac"], describe_ports(found), self.known(ip, row["mac"])))
-        self.info.set(f"{ip}: {len(found)} open port(s).")
+        self.info.set(f"{ip}: {len(found)} open port(s)" + (" so far (stopped)." if stopped else "."))
 
     def text_rows(self):
         return [(ip, r["name"], r["mac"], describe_ports(r["ports"])) for ip, r in sorted(self.rows.items(), key=lambda kv: ip_key(kv[0]))]
