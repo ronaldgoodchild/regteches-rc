@@ -18,7 +18,7 @@ STATS_CHOICES = (2, 5, 10, 30, 60)
 SCALE_CHOICES = (80, 90, 100, 110, 125, 150, 175, 200)
 MAX_SESSION_TABS = 12
 
-DEFAULTS = {"confirm_exit": True, "reopen_tabs": False, "check_interval": 60, "stats_interval": 5, "ui_scale": 100}
+DEFAULTS = {"confirm_exit": True, "reopen_tabs": False, "check_interval": 60, "stats_interval": 5, "ui_scale": 100, "file_columns": ["size", "modified"]}
 
 SHORTCUTS = (
     ("Ctrl+K", "Quick connect"), ("Ctrl+N", "Add a server"), ("Ctrl+W", "Disconnect the current tab"),
@@ -49,6 +49,8 @@ def clean(data):
         out["stats_interval"] = data["stats_interval"]
     if data.get("ui_scale") in SCALE_CHOICES:
         out["ui_scale"] = data["ui_scale"]
+    if isinstance(data.get("file_columns"), list):
+        out["file_columns"] = [c for c in ("size", "modified", "link") if c in data["file_columns"]]
     return out
 
 

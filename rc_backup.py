@@ -95,7 +95,7 @@ def portable_host(h):
     """A copy of a server with its saved passwords written in clear (they only ever exist inside the encrypted bundle)."""
     out = {k: json.loads(json.dumps(v)) for k, v in h.items() if not k.startswith("_")}
     lost = 0
-    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password")):
+    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password"), ("totp_secret_enc", "totp_secret")):
         blob = out.pop(blob_key, "")
         out[plain_key] = _open(blob)
         lost += bool(blob and not out[plain_key])
@@ -109,7 +109,7 @@ def portable_host(h):
 
 def restore_host(d):
     h = json.loads(json.dumps(d))
-    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password")):
+    for blob_key, plain_key in (("password_enc", "password"), ("rustdesk_password_enc", "rustdesk_password"), ("totp_secret_enc", "totp_secret")):
         h[blob_key] = _lock(h.pop(plain_key, "") or "")
     for c in h.get("connections", []):
         pw = c.pop("password", "")

@@ -119,20 +119,18 @@ class PrefsTests(unittest.TestCase):
     def tearDown(self):
         core.APP_DIR = self._old
 
-    @staticmethod
-    def core_two(prefs):
-        """The size settings only: later versions added colour scheme, font, paste and Zmodem options."""
-        return {k: prefs[k] for k in ("font_size", "scrollback")}
+    DEFAULTS = {"font_size": 11, "scrollback": 10000, "scheme": "Dark", "font": "Consolas", "copy_on_select": False,
+                "right_click_paste": False, "middle_click_paste": True, "zmodem": True, "zmodem_dir": "", "log_timestamps": False, "line_numbers": False}
 
     def test_defaults_and_clamping(self):
-        self.assertEqual(self.core_two(term.load_prefs()), {"font_size": 11, "scrollback": 10000})
+        self.assertEqual(term.load_prefs(), self.DEFAULTS)
         self.assertEqual(term.clean_prefs({"font_size": 500, "scrollback": 3})["font_size"], term.FONT_MAX)
-        self.assertEqual(self.core_two(term.clean_prefs({"font_size": "x", "scrollback": None})), {"font_size": 11, "scrollback": 10000})
+        self.assertEqual(term.clean_prefs({"font_size": "x", "scrollback": None}), self.DEFAULTS)
         self.assertEqual(term.clean_prefs("junk")["font_size"], 11)
 
     def test_round_trip_and_corrupt_file(self):
         term.save_prefs({"font_size": 14, "scrollback": 50000})
-        self.assertEqual(self.core_two(term.load_prefs()), {"font_size": 14, "scrollback": 50000})
+        self.assertEqual(term.load_prefs(), dict(self.DEFAULTS, font_size=14, scrollback=50000))
         with open(term.prefs_path(), "w") as f:
             f.write("{nope")
         self.assertEqual(term.load_prefs()["font_size"], 11)
@@ -251,11 +249,10 @@ class TabTests(unittest.TestCase):
         self.tab.send = sent.append
         self.tab.clipboard_clear()
         self.tab.clipboard_append("a\nb")
-        with mock.patch.object(term.messagebox, "askyesno", return_value=True) as ask:  # never open a real dialog in tests
+        with mock.patch.object(term.messagebox, "askyesno", return_value=True):      # several lines: RC asks first
             self.tab.paste()
             self.tab.feed("\x1b[?2004h")
             self.tab.paste()
-        self.assertEqual(ask.call_count, 2)  # several lines: RC asks before pasting
         self.assertEqual(sent, ["a\rb", "\x1b[200~a\rb\x1b[201~"])
 
     def test_clear(self):

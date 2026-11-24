@@ -18,9 +18,6 @@ os.environ["RC_DATA_DIR"] = os.path.join(HERE, "_tmp_data")   # importing rc_man
 import rc_manager  # noqa: E402
 
 VER = rc_manager.APP_VERSION
-# every RC module (rc_manager.py is the entry point); the build and the source/ folder in the zip both use this list
-MODULES = ['rc_tools', 'rc_files', 'rc_theme', 'rc_terminal', 'rc_backup', 'rc_glances', 'rc_identity', 'rc_import', 'rc_localsrv', 'rc_monitor', 'rc_netscan', 'rc_notes', 'rc_prefs', 'rc_quick', 'rc_record', 'rc_transport', 'rc_zmodem']
-
 NAME = f"REGTeches_RC_v{VER}"
 import tempfile
 WORK = os.path.join(tempfile.gettempdir(), "rc_build_work")   # outside OneDrive: its sync locks build folders
@@ -70,7 +67,8 @@ cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile
        "--name", "RC", "--icon", ico, "--version-file", version_txt,
        "--distpath", os.path.join(WORK, "dist"), "--workpath", os.path.join(WORK, "work"), "--specpath", WORK,
        "--paths", SRC,
-       *[a for m in MODULES for a in ("--hidden-import", m)], "--hidden-import", "serial", "--hidden-import", "pyte", "--hidden-import", "wcwidth",
+       "--hidden-import", "rc_tools", "--hidden-import", "rc_files", "--hidden-import", "rc_theme",
+       "--hidden-import", "rc_terminal", "--hidden-import", "rc_monitor", "--hidden-import", "rc_identity", "--hidden-import", "rc_quick", "--hidden-import", "rc_transport", "--hidden-import", "rc_backup", "--hidden-import", "rc_netscan", "--hidden-import", "rc_localsrv", "--hidden-import", "rc_import", "--hidden-import", "rc_record", "--hidden-import", "rc_notes", "--hidden-import", "rc_glances", "--hidden-import", "rc_zmodem", "--hidden-import", "rc_prefs", "--hidden-import", "rc_sync", "--hidden-import", "rc_firewall", "--hidden-import", "rc_capture", "--hidden-import", "rc_totp", "--hidden-import", "rc_schemes", "--hidden-import", "rc_suggest", "--hidden-import", "rc_docker", "--hidden-import", "rc_cloud", "--hidden-import", "rc_hardware", "--hidden-import", "serial", "--hidden-import", "serial.tools.list_ports", "--hidden-import", "serial.tools.list_ports_windows", "--hidden-import", "pyte", "--hidden-import", "wcwidth",
        "--hidden-import", "paramiko", "--hidden-import", "cryptography", "--hidden-import", "PIL",
        os.path.join(SRC, "rc_manager.py")]
 print(" ".join(cmd))
@@ -97,10 +95,10 @@ with open(os.path.join(HERE, "QUICK_START.txt"), encoding="utf-8") as f:
 with open(os.path.join(PKG, "QUICK START.txt"), "w", encoding="utf-8") as f:
     f.write(quick)
 with open(os.path.join(PKG, "requirements-source.txt"), "w") as f:
-    f.write("# Only needed to run the source code instead of RC.exe\nparamiko>=3.4\npyte>=0.8\ncryptography\n")
+    f.write("# Only needed to run the source code instead of RC.exe\nparamiko>=3.4\npyte>=0.8\ncryptography\npyserial>=3.5\n")
 src_dir = os.path.join(PKG, "source")
 os.makedirs(src_dir, exist_ok=True)
-for fn in ["rc_manager.py"] + [m + ".py" for m in MODULES] + ["RC.bat"]:
+for fn in ("rc_manager.py", "rc_files.py", "rc_tools.py", "rc_theme.py", "rc_terminal.py", "rc_monitor.py", "rc_identity.py", "rc_quick.py", "rc_transport.py", "rc_backup.py", "rc_netscan.py", "rc_localsrv.py", "rc_import.py", "rc_record.py", "rc_notes.py", "rc_glances.py", "rc_zmodem.py", "rc_prefs.py", "rc_sync.py", "rc_firewall.py", "rc_capture.py", "rc_totp.py", "rc_schemes.py", "rc_suggest.py", "rc_docker.py", "rc_cloud.py", "rc_hardware.py", "RC.bat"):
     shutil.copy(os.path.join(SRC, fn), src_dir)
 if MEDIA and os.path.isdir(MEDIA):
     shots = os.path.join(PKG, "screenshots")
@@ -109,11 +107,6 @@ if MEDIA and os.path.isdir(MEDIA):
         if fn.lower().endswith((".png", ".gif", ".mp4")) and not fn.startswith("theme_"):
             shutil.copy(os.path.join(MEDIA, fn), shots)
 
-# the web manual (pictures, video, every menu explained): docs/ in the source becomes manual/ next to RC.exe
-docs_src = os.path.join(SRC, "docs")
-if os.path.isdir(docs_src):
-    shutil.copytree(docs_src, os.path.join(PKG, "manual"))
-
 # ─── safety: nothing personal may be in the package ─────────────────────────
 banned = ("hosts.json", "known_hosts", "settings.json", "snippets.json")
 for root_, _, files in os.walk(PKG):
@@ -121,9 +114,9 @@ for root_, _, files in os.walk(PKG):
         assert fn not in banned and not fn.endswith((".pem", ".ppk")) and "id_ed25519" not in fn, f"personal file in package: {fn}"
 for root_, _, files in os.walk(PKG):
     for fn in files:
-        if fn.endswith((".py", ".md", ".txt", ".html")):
+        if fn.endswith((".py", ".md", ".txt")):
             text = open(os.path.join(root_, fn), encoding="utf-8", errors="ignore").read()
-            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild(?!(/|\.github\.io/)(regteches-rc|scoop-regteches)\b)", r"tail4b8cdb"):  # RC's own public repo and bucket are fine; any other repo name is not
+            for pat in (r"192\.168\.8\.\d+", r"ronaldgoodchild(?!/(regteches-rc|scoop-regteches)\b)", r"tail4b8cdb"):  # RC's own public repo and bucket are fine; any other repo name is not
                 assert not re.search(pat, text), f"private detail {pat} found in {fn}"
 
 # ─── zip ────────────────────────────────────────────────────────────────────

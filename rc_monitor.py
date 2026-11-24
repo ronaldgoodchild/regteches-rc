@@ -581,6 +581,21 @@ class MonitorTab(ttk.Frame):
             self.book.forget(self.page_services)
             self.book.forget(self.page_ports)
             self.build_containers()
+        else:
+            import rc_capture
+            import rc_firewall
+            self.page_firewall = rc_firewall.FirewallPage(self)
+            self.book.add(self.page_firewall, text="  Firewall  ")
+            self.page_capture = rc_capture.CapturePage(self)
+            self.book.add(self.page_capture, text="  Capture  ")
+            import rc_hardware
+            self.page_hardware = rc_hardware.HardwarePage(self)
+            self.book.add(self.page_hardware, text="  Hardware  ")
+            self.page_ipmi = rc_hardware.IpmiPage(self)
+            self.book.add(self.page_ipmi, text="  IPMI  ")
+            import rc_docker
+            self.page_docker = rc_docker.DockerPage(self)
+            self.book.insert(self.page_firewall, self.page_docker, text="  Docker  ")
         self.book.bind("<<NotebookTabChanged>>", self.tab_changed)
 
         self.thread = threading.Thread(target=self.worker_glances if self.glances else self.worker, args=(self.generation,), daemon=True,
@@ -842,6 +857,16 @@ class MonitorTab(ttk.Frame):
             return
         if label == "Services" and not self.services_loaded:
             self.load_services()
+        elif label == "Hardware" and not self.page_hardware.loaded:
+            self.page_hardware.load()
+        elif label == "IPMI" and not self.page_ipmi.loaded:
+            self.page_ipmi.load()
+        elif label == "Docker" and not self.page_docker.loaded:
+            self.page_docker.load()
+        elif label == "Firewall" and not self.page_firewall.loaded:
+            self.page_firewall.load()
+        elif label == "Capture" and not self.page_capture.loaded:
+            self.page_capture.load()
         elif label == "System" and not self.info_loaded:
             self.load_info()
         elif label == "System" and self.glances:
@@ -1033,6 +1058,9 @@ class MonitorTab(ttk.Frame):
 
     def close(self):
         self.closed = True
+        page = getattr(self, "page_capture", None)
+        if page is not None:
+            page.close()
         self.generation += 1
         self.stop_evt.set()
         self.now_evt.set()
