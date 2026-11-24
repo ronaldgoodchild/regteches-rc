@@ -42,8 +42,12 @@ class ScanJobTests(unittest.TestCase):
         srv.bind(("127.0.0.1", 0))
         srv.listen(5)
         port = srv.getsockname()[1]
+        spare = socket.socket()                      # a port that was just free (the neighbour, port + 1, can belong to another test)
+        spare.bind(("127.0.0.1", 0))
+        closed = spare.getsockname()[1]
+        spare.close()
         found, finished = {}, threading.Event()
-        job = scan.ScanJob(["127.0.0.1"], [port, port + 1 if port < 65535 else port - 1],
+        job = scan.ScanJob(["127.0.0.1"], [port, closed],
                            lambda ip, up, ports: found.update(ip=ip, up=up, ports=ports),
                            lambda d, t: None, lambda stopped: finished.set(), workers=4, timeout=1.0).start()
         self.assertTrue(finished.wait(20))
