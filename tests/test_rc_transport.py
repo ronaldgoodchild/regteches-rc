@@ -4,6 +4,7 @@ pyserial's loop:// port.  Run from the RC folder:  python -m unittest discover -
 
 import os
 import queue
+import re
 import socket
 import sys
 import tempfile
@@ -170,9 +171,11 @@ class FakeTelnetServer:
                 if not d:
                     return
                 self.received += d
-                payload = bytes(d)
-                if bytes([IAC]) not in payload:
-                    c.sendall(payload)                                                    # echo
+                # echo what was typed; the client's Telnet replies (IAC ... / IAC SB ... IAC SE) may arrive in the
+                # same packet as the typed text, so strip them instead of skipping the whole chunk
+                typed = re.sub(rb"\xff[\xfb-\xfe].|\xff\xfa.*?\xff\xf0", b"", bytes(d), flags=re.S)
+                if typed:
+                    c.sendall(typed)
                 if self.hang_up_after and self.hang_up_after in self.received:
                     c.close()
                     return

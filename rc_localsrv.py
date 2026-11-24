@@ -349,6 +349,17 @@ class HttpServer:
                 return super().list_directory(path)
 
             def do_POST(self):
+                # Read and drop the request body first: closing a socket that still holds unread data makes Windows
+                # reset the connection, and the client then never sees the 405 answer.
+                try:
+                    size = int(self.headers.get("Content-Length") or 0)
+                except ValueError:
+                    size = 0
+                if 0 < size <= 1_000_000:
+                    try:
+                        self.rfile.read(size)
+                    except OSError:
+                        pass
                 self.send_error(405, "Read-only")
 
             do_PUT = do_DELETE = do_POST
