@@ -48,7 +48,7 @@ except ImportError:  # shown as a friendly message when SSH/SFTP is used
     paramiko = None
 
 APP_NAME = "Remote Connection Manager"
-APP_VERSION = "2.13.1"
+APP_VERSION = "2.19.0"
 COMPANY = "REGTeches"
 AUTHOR = "Ronald Goodchild"
 FULL_TITLE = f"{COMPANY} {APP_NAME} v{APP_VERSION}  —  Developed by {AUTHOR}"
@@ -98,8 +98,9 @@ EXTRA_LABEL = dict(EXTRA_TYPES)
 EXTRA_ACTION = {"ssh": "ssh", "sftp": "files", "ftp": "files", "ftps": "files", "rdp": "rdp", "vnc": "vnc", "rustdesk": "rustdesk", "web": "web",
                 "mail": "mail", "smb": "smb", "ps": "ps", "telnet": "telnet", "serial": "serial"}
 EXTRA_PORT = {"ssh": 22, "sftp": 22, "ftp": 21, "ftps": 21, "rdp": 3389, "vnc": 5900, "rustdesk": 0, "web": 0, "mail": 0, "smb": 445, "ps": 0, "telnet": 23, "serial": 0}
-FILE_MODES = ["SFTP", "FTP", "FTPS"]
-DEFAULT_FILE_PORT = {"SFTP": 22, "FTP": 21, "FTPS": 21}
+FILE_MODES = ["SFTP", "FTP", "FTPS", "WebDAV", "WebDAVS", "S3", "S3 (http)"]
+CLOUD_FILE_MODES = ("WebDAV", "WebDAVS", "S3", "S3 (http)")
+DEFAULT_FILE_PORT = {"SFTP": 22, "FTP": 21, "FTPS": 21, "WebDAV": 80, "WebDAVS": 443, "S3": 443, "S3 (http)": 9000}
 TUNNEL_KINDS = ("local", "remote", "dynamic")
 SNIPPETS_FILE = os.path.join(APP_DIR, "snippets.json")
 SETTINGS_FILE = os.path.join(APP_DIR, "settings.json")
@@ -241,7 +242,7 @@ def unprotect_password(blob):
 # ─── Host storage ────────────────────────────────────────────────────────────
 
 NEW_HOST = {
-    "name": "", "address": "", "group": "", "user": "", "ssh_port": 22, "rdp_port": 3389, "vnc_port": 5900, "rustdesk_id": "", "rustdesk_password_enc": "",
+    "name": "", "address": "", "group": "", "user": "", "ssh_port": 22, "rdp_port": 3389, "vnc_port": 5900, "rustdesk_id": "", "rustdesk_password_enc": "", "totp_secret_enc": "", "s3_region": "",
     "file_mode": "SFTP", "file_port": 0, "key_file": "", "web_url": "", "mail_url": "",
     "default_action": "ssh", "notes": "", "password_enc": "", "connections": [],
     "tunnels": [], "bookmarks": [], "last_path": "",
@@ -286,7 +287,7 @@ def sanitize_host(h, problems=None):
     if merged.get("default_action") not in ACTION_LABEL:
         problems.append(f"{name}: default_action {merged.get('default_action')!r} unknown, using ssh")
         merged["default_action"] = "ssh"
-    for field in ("name", "group", "user", "key_file", "web_url", "mail_url", "notes", "password_enc", "last_path", "rustdesk_id", "rustdesk_password_enc", "identity", "proxy", "login_script", "glances_user", "glances_password_enc"):
+    for field in ("name", "group", "user", "key_file", "web_url", "mail_url", "notes", "password_enc", "last_path", "rustdesk_id", "rustdesk_password_enc", "totp_secret_enc", "s3_region", "identity", "proxy", "login_script", "glances_user", "glances_password_enc"):
         if not isinstance(merged.get(field), str):
             merged[field] = "" if merged.get(field) is None else str(merged[field])
     merged["favorite"] = bool(merged.get("favorite"))
@@ -1190,7 +1191,7 @@ def probe_host(h):
             threading.Thread(target=reach, args=("rdp", "Remote Desktop", h["rdp_port"], "tcp")),
             threading.Thread(target=web)]
     if not (mode == "SFTP" and fport == h["ssh_port"]):
-        jobs.append(threading.Thread(target=reach, args=("files", f"{mode} files", fport, "ssh" if mode == "SFTP" else "ftp")))
+        jobs.append(threading.Thread(target=reach, args=("files", f"{mode} files", fport, "ssh" if mode == "SFTP" else "tcp" if mode in CLOUD_FILE_MODES else "ftp")))
     order = ["name", "ssh", "files", "rdp", "web"]
     for i, c in enumerate(h.get("connections", [])):
         t, key = c["type"], f"x{i}"
@@ -1354,12 +1355,26 @@ def open_ssh_client(app, host, user, password, key_only=False, _chain=()):
             if addr != host["address"]:  # connect the socket ourselves so the host key is still checked under the main address
                 sock = socket.create_connection((addr, port), 12)
                 via = f" via alternate address {addr}"
+        totp = unprotect_password(host["totp_secret_enc"]) if host.get("totp_secret_enc") else ""
         with timed("SSH connect", f"{user or '?'}@{host['address']}:{port} via {method}{via}", slow_ms=4000):
-            client.connect(
-                host["address"], port=port, username=user or None, sock=sock,
-                password=password or None, key_filename=(host.get("key_file") or None),
-                passphrase=password or None, timeout=12, banner_timeout=15, auth_timeout=15,
-                allow_agent=not key_only, look_for_keys=not key_only)
+            try:
+                client.connect(
+                    host["address"], port=port, username=user or None, sock=sock,
+                    password=None if (totp and not host.get("key_file")) else (password or None),     # with a code the password goes in the 2-step login below
+                    key_filename=(host.get("key_file") or None),
+                    passphrase=password or None, timeout=12, banner_timeout=15, auth_timeout=15,
+                    allow_agent=not key_only, look_for_keys=not key_only)
+            except paramiko.BadHostKeyException:
+                raise
+            except paramiko.SSHException:
+                tr = client.get_transport()
+                if not totp or tr is None or not tr.is_active():
+                    raise
+            if totp:                       # the server wants a second step (password + code, or key + code)
+                tr = client.get_transport()
+                if tr is not None and not tr.is_authenticated():
+                    import rc_totp
+                    rc_totp.authenticate(tr, user or "", password, totp)
     except paramiko.BadHostKeyException:
         log.error("SSH: HOST KEY MISMATCH for %s - connection refused", host["address"])
         if jump_client:
@@ -1411,7 +1426,7 @@ class SftpBackend:
         return self.sftp.normalize(".")
 
     def listdir(self, path):
-        out = []
+        out, links = [], {}
         for a in self.sftp.listdir_attr(path):
             is_dir = stat.S_ISDIR(a.st_mode or 0)
             if stat.S_ISLNK(a.st_mode or 0):
@@ -1419,8 +1434,17 @@ class SftpBackend:
                     is_dir = stat.S_ISDIR(self.sftp.stat(posixpath.join(path, a.filename)).st_mode)
                 except OSError:
                     pass
+                if len(links) < 300:
+                    try:
+                        links[a.filename] = self.sftp.readlink(posixpath.join(path, a.filename)) or ""
+                    except (OSError, IOError):
+                        links[a.filename] = ""
             out.append((a.filename, is_dir, a.st_size or 0, a.st_mtime or 0))
+        self.last_links = links
         return out
+
+    def symlink(self, target, path):
+        self.sftp.symlink(target, path)
 
     def stat(self, path):
         """(is_dir, size, mtime, mode) or None if it doesn't exist."""
@@ -1724,18 +1748,18 @@ class HostEditor(ttk.Frame):
         LABELS = {
             "name": "Name", "address": "IP address or DNS name", "group": "Group", "default_action": "Double-click does",
             "user": "Username", "_password": "Password (or key passphrase)", "identity": "Saved login (identity)",
-            "key_file": "SSH key file (optional)",
+            "key_file": "SSH key file (optional)", "_totp": "Authenticator secret (2-step login, optional)",
             "ssh_port": "SSH port", "rdp_port": "Remote Desktop port", "vnc_port": "VNC port",
             "rustdesk_id": "RustDesk ID (blank = connect by IP address)", "_rd_password": "RustDesk password (optional)",
-            "file_mode": "File transfer", "file_port": "File port (0 = default)",
+            "file_mode": "File transfer", "file_port": "File port (0 = default)", "s3_region": "S3 region (blank = us-east-1)",
             "web_url": "Web address (blank = http://address)", "mail_url": "Mail / webmail address",
             "alt_addresses": "Other addresses (comma-separated, tried in order)", "jump_host": "Connect through (jump server)",
             "proxy": "Connect via proxy", "mac": "MAC address (for Wake-on-LAN)",
         }
         layout = [
             (p_general, ["name", "address", "group", "default_action"]),
-            (p_login, ["user", "_password", "identity", "key_file"]),
-            (p_conn, ["ssh_port", "rdp_port", "vnc_port", "rustdesk_id", "_rd_password", "file_mode", "file_port", "web_url", "mail_url"]),
+            (p_login, ["user", "_password", "identity", "key_file", "_totp"]),
+            (p_conn, ["ssh_port", "rdp_port", "vnc_port", "rustdesk_id", "_rd_password", "file_mode", "file_port", "s3_region", "web_url", "mail_url"]),
             (p_net, ["alt_addresses", "jump_host", "proxy", "mac"]),
         ]
         self.jump_map = {"(none)": ""}
@@ -1766,6 +1790,14 @@ class HostEditor(ttk.Frame):
                     if host.get("rustdesk_password_enc"):
                         ttk.Checkbutton(f, text="🔑 saved - tick to forget", variable=self.clear_rd_pw).grid(
                             row=r, column=2, sticky="w", padx=4)
+                    continue
+                if key == "_totp":
+                    self.totp_var = v
+                    v.set("")
+                    ttk.Entry(f, textvariable=v, width=36, show="•").grid(row=r, column=1, sticky="w", pady=3)
+                    self.clear_totp = tk.BooleanVar(value=False)
+                    if host.get("totp_secret_enc"):
+                        ttk.Checkbutton(f, text="🔑 saved - tick to forget", variable=self.clear_totp).grid(row=r, column=2, sticky="w", padx=4)
                     continue
                 if key == "_password":
                     self.pw_var = v
@@ -1828,11 +1860,15 @@ class HostEditor(ttk.Frame):
         if host.get("password_enc"):
             ttk.Checkbutton(p_login, text="🔑 A password is saved (encrypted, this Windows account only). Tick to forget it;\n"
                                           "type a new one above to replace it.", variable=self.clear_pw).grid(
-                row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
+                row=5, column=0, columnspan=3, sticky="w", pady=(8, 2))
         else:
             ttk.Label(p_login, text="🔑 Anything typed in Password is saved encrypted on this PC (Windows account only)\n"
                                     "and filled in for you when you connect. An identity replaces this username and password.",
-                      foreground="#555").grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 2))
+                      foreground="#555").grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 2))
+        ttk.Label(p_login, foreground="#555", justify="left",
+                  text="Authenticator secret: the key (or otpauth:// link) from the 2-step setup of a server that uses Google Authenticator.\n"
+                       "RC then types the 6-digit code for you when logging in and at later code prompts.").grid(
+            row=6, column=0, columnspan=3, sticky="w", pady=(4, 2))
         # After login
         self.script = tk.Text(p_script, width=80, height=7, wrap="none", font=("Consolas", 9))
         self.script.insert("1.0", host.get("login_script", ""))
@@ -2025,6 +2061,14 @@ class HostEditor(ttk.Frame):
             h["rustdesk_password_enc"] = protect_password(self.rd_pw_var.get())
         elif self.clear_rd_pw.get():
             h["rustdesk_password_enc"] = ""
+        if self.totp_var.get().strip():
+            import rc_totp
+            try:
+                h["totp_secret_enc"] = protect_password(rc_totp.clean_secret(self.totp_var.get()))
+            except ValueError as e:
+                errors.append("Login: " + str(e))
+        elif self.clear_totp.get():
+            h["totp_secret_enc"] = ""
         if self.pw_var.get():
             h["password_enc"] = protect_password(self.pw_var.get())
         elif self.clear_pw.get():
@@ -2078,8 +2122,12 @@ class HostEditor(ttk.Frame):
                 try:
                     port = int(h["file_port"] or DEFAULT_FILE_PORT[h["file_mode"]])
                     with timed(f"{h['file_mode']} login test", f"{user}@{h['address']}:{port}", slow_ms=4000):
-                        ftp = open_ftp(h, port, user, pw)
-                        FtpBackend(ftp).close()
+                        if h["file_mode"] in CLOUD_FILE_MODES:
+                            import rc_cloud
+                            rc_cloud.open_backend(h, port, user, pw).close()
+                        else:
+                            ftp = open_ftp(h, port, user, pw)
+                            FtpBackend(ftp).close()
                     lines.append(("ok", f"{h['file_mode']} login worked."))
                 except Exception as e:
                     lines.append(("fail", f"{h['file_mode']} login failed: {str(e) or e.__class__.__name__}"))
@@ -2180,6 +2228,7 @@ class App:
         self.pump()
         self.apply_prefs()
         self.monitor.start()
+        self.root.after(1500, self.auto_sync_start)
         self.root.after(30000, self.tick)
         self.theme.apply()
         self.sync_theme_button()
@@ -2198,7 +2247,7 @@ class App:
         self.drag_tab = None
         self.nb.bind("<ButtonPress-1>", self.tab_press, add="+")
         self.nb.bind("<B1-Motion>", self.tab_drag, add="+")
-        self.nb.bind("<ButtonRelease-1>", lambda e: setattr(self, "drag_tab", None), add="+")
+        self.nb.bind("<ButtonRelease-1>", self.tab_release, add="+")
         if self.prefs["reopen_tabs"]:
             self.root.after(900, self.restore_session)
 
@@ -2311,6 +2360,11 @@ class App:
             rc_prefs.save_session(self.session_state() if self.prefs.get("reopen_tabs") else [])
         except OSError:
             log.warning("Could not save the list of open tabs", exc_info=True)
+        try:
+            import rc_sync
+            rc_sync.auto_sync_exit(self)
+        except Exception:
+            log.warning("automatic sync at exit failed", exc_info=True)
         self.monitor.stop()
         self.tunnel_mgr.stop_all()
         for attr in ("localsrv_tab", "netscan_tab"):      # a TFTP/HTTP server or a scan must not outlive the window
@@ -2352,6 +2406,25 @@ class App:
     def backup_everything(self):
         import rc_backup
         rc_backup.backup_dialog(self)
+
+    def auto_sync_start(self):
+        try:
+            import rc_sync
+            rc_sync.auto_sync_start(self)
+        except Exception:
+            log.warning("automatic sync at start failed", exc_info=True)
+
+    def open_sync(self):
+        import rc_sync
+        rc_sync.open_dialog(self)
+
+    def sync_now(self):
+        import rc_sync
+        cfg = rc_sync.load_config()
+        if not (cfg["folder"] and cfg["password_enc"]):
+            rc_sync.open_dialog(self)
+        else:
+            rc_sync.run(self)
 
     def restore_backup(self):
         import rc_backup
@@ -2429,6 +2502,21 @@ class App:
         if not folder:
             return
         self.add_tab(rc_tools.ImportTab(self, rc_import.scan_xshell_folder(folder)), "⇩ Import (Xshell)")
+
+    def import_rdm(self):
+        import rc_import, rc_tools
+        path = filedialog.askopenfilename(title="Devolutions Remote Desktop Manager export", filetypes=[("RDM export", "*.rdm *.json"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            items = rc_import.parse_rdm(rc_import.read_text(path))
+        except (OSError, ValueError) as e:
+            messagebox.showerror(APP_NAME, f"Could not read that file:\n{e}", parent=self.root)
+            return
+        if not items:
+            messagebox.showinfo(APP_NAME, "No SSH, Telnet, RDP, VNC or FTP connections were found in that file.", parent=self.root)
+            return
+        self.add_tab(rc_tools.ImportTab(self, items), "⇩ Import (RDM)")
 
     def import_sessions(self):
         import rc_tools
@@ -2583,11 +2671,15 @@ class App:
         imp.add_command(label="From PuTTY / WinSCP / ssh config…", command=self.import_sessions)
         imp.add_command(label="From MobaXterm (.mxtsessions export)…", command=self.import_mobaxterm)
         imp.add_command(label="From Xshell (Sessions folder)…", command=self.import_xshell)
+        imp.add_command(label="From Devolutions Remote Desktop Manager (.rdm / .json)…", command=self.import_rdm)
         file_m.add_cascade(label="Import servers", menu=imp)
         file_m.add_command(label="Export servers to a CSV file…", command=self.export_csv)
         bak = tk.Menu(file_m, tearoff=0)
         bak.add_command(label="Back up everything (encrypted)…", command=self.backup_everything)
         bak.add_command(label="Restore from a backup…", command=self.restore_backup)
+        bak.add_separator()
+        bak.add_command(label="Sync through a folder…", command=self.open_sync)
+        bak.add_command(label="Sync now", command=self.sync_now)
         file_m.add_cascade(label="Backup", menu=bak)
         file_m.add_separator()
         file_m.add_command(label="Disconnect current tab", accelerator="Ctrl+W", command=self.close_tab)
@@ -2636,10 +2728,8 @@ class App:
         size.add_command(label="Reset terminal text size", command=lambda: self.terminal_font(0))
         view.add_cascade(label="Terminal text size", menu=size)
         import rc_terminal
-        tsc = tk.Menu(view, tearoff=0)
+        tsc = tk.Menu(view, tearoff=0, postcommand=lambda: self.fill_tscheme_menu(tsc))
         self.tscheme_var = tk.StringVar(value=rc_terminal.load_prefs()["scheme"])
-        for name in rc_terminal.SCHEMES:
-            tsc.add_radiobutton(label=name, variable=self.tscheme_var, value=name, command=lambda n=name: self.set_terminal_scheme(n))
         view.add_cascade(label="Terminal colours", menu=tsc)
         view.add_command(label="Terminal font…", command=self.terminal_font_dialog)
         bar.add_cascade(label="View", menu=view)
@@ -2705,6 +2795,33 @@ class App:
             return act["tab"]
         terms = tab.terminals()
         return terms[0] if terms else None
+
+    def fill_tscheme_menu(self, menu):
+        import rc_terminal
+        menu.delete(0, "end")
+        for name in rc_terminal.SCHEMES:
+            menu.add_radiobutton(label=name, variable=self.tscheme_var, value=name, command=lambda n=name: self.set_terminal_scheme(n))
+        menu.add_separator()
+        menu.add_command(label="Import a colour scheme…", command=self.import_terminal_scheme)
+        custom = [n for n in rc_terminal.SCHEMES if n not in rc_terminal.BUILTIN_SCHEMES]
+        if custom:
+            rm = tk.Menu(menu, tearoff=0)
+            for name in custom:
+                rm.add_command(label=name, command=lambda n=name: self.remove_terminal_scheme(n))
+            menu.add_cascade(label="Remove an imported scheme", menu=rm)
+
+    def import_terminal_scheme(self):
+        import rc_schemes
+        import rc_terminal
+        names = rc_schemes.import_dialog(self.root, rc_terminal.SCHEMES, rc_terminal.BUILTIN_SCHEMES, rc_terminal.SCHEMES[rc_terminal.DEFAULT_SCHEME])
+        if names:
+            self.set_terminal_scheme(names[0])
+
+    def remove_terminal_scheme(self, name):
+        import rc_schemes
+        import rc_terminal
+        if rc_schemes.remove_dialog(self.root, rc_terminal.SCHEMES, rc_terminal.BUILTIN_SCHEMES, name) and self.tscheme_var.get() == name:
+            self.set_terminal_scheme(rc_terminal.DEFAULT_SCHEME)
 
     def set_terminal_scheme(self, name):
         import rc_terminal
@@ -3466,6 +3583,13 @@ class App:
             return
         if hasattr(tab, "terminals"):
             m.add_command(label="Duplicate this session", command=self.duplicate_session)
+            if self.splittable(tab):
+                views = self.split_views()
+                sm = tk.Menu(m, tearoff=0)
+                sm.add_command(label="Into a new split view", command=lambda: self.move_to_split(tab, "new"))
+                for i, v in enumerate(views, 1):
+                    sm.add_command(label=f"Into split view {i}  ({len(v.panes)} terminal(s))", command=lambda v=v: self.move_to_split(tab, v))
+                m.add_cascade(label="⊞ Move into a split view (or drag the tab down)", menu=sm)
             term = self.active_terminal()
             if term is not None:
                 m.add_checkbutton(label="📡 Broadcast input with other ticked terminals", variable=term.bcast_var,
@@ -3530,11 +3654,65 @@ class App:
             self.drag_tab = self.nb.nametowidget(self.nb.tabs()[self.nb.index(f"@{e.x},{e.y}")])
         except (tk.TclError, IndexError):
             self.drag_tab = None
+        self.drag_moved = False
+
+    def tab_release(self, e):
+        """Letting go of a dragged terminal tab down in the window (below the tab strip) puts it into a split view."""
+        w, self.drag_tab = getattr(self, "drag_tab", None), None
+        if w is None or not getattr(self, "drag_moved", False) or self.nb.identify(e.x, e.y) != "" or e.y < 30:
+            return
+        if self.splittable(w):
+            self.after_idle(lambda: self.move_to_split(w, ask_at=(e.x_root, e.y_root)))
+
+    @staticmethod
+    def splittable(tab):
+        """A single SSH terminal tab (not Telnet / Serial, not a split view or a recording)."""
+        return hasattr(tab, "terminals") and not hasattr(tab, "panes") and getattr(tab, "kind", "") == "ssh" and not getattr(tab, "playback", False)
+
+    def split_views(self):
+        return [self.nb.nametowidget(t) for t in self.nb.tabs() if hasattr(self.nb.nametowidget(t), "panes")]
+
+    def move_to_split(self, tab, split=None, ask_at=None):
+        """Replace this terminal tab by a pane in a split view (a new one, or an existing one). The session is opened again in the pane
+        (a running connection cannot move between windows), so the old tab is closed. Returns the split view, or None."""
+        if not self.splittable(tab):
+            return None
+        views = self.split_views()
+        if split is None and len(views) > 1 and ask_at:
+            m = tk.Menu(self.root, tearoff=0)
+            m.add_command(label="Into a new split view", command=lambda: self.move_to_split(tab, "new"))
+            for i, v in enumerate(views, 1):
+                m.add_command(label=f"Into split view {i}  ({len(v.panes)} terminal(s))", command=lambda v=v: self.move_to_split(tab, v))
+            m.tk_popup(*ask_at)
+            return None
+        if split is None:
+            split = views[0] if views else "new"
+        if split == "new":
+            split = self.new_split_view()
+        if getattr(tab, "_rc_locked", False):
+            self.status.set("That tab is locked: unlock it before moving it into a split view.")
+            return None
+        if len(split.panes) >= split.MAX_PANES:
+            messagebox.showinfo("Split view", f"A split view holds up to {split.MAX_PANES} terminals.", parent=self.root)
+            return None
+        pane = split.add_host(tab.host, creds=tab.creds)
+        if pane is None:
+            return None
+        if hasattr(tab, "close"):
+            tab.close()
+        self.nb.forget(tab)
+        tab.destroy()
+        self.nb.select(split)
+        self.status.set(f"Moved {tab.host.get('name', 'the session')} into a split view")
+        return split
 
     def tab_drag(self, e):
         """Drag a tab sideways to reorder it (the Servers tab stays first)."""
         w = self.drag_tab
         if w is None or w is self.home:
+            return
+        if e.y >= 30:
+            self.drag_moved = True              # dragged down into the window: letting go will offer a split view
             return
         try:
             target = self.nb.index(f"@{e.x},{e.y}")
@@ -3542,6 +3720,7 @@ class App:
             return
         if target >= 1 and target != self.nb.index(w):
             self.nb.insert(target, w)
+            self.drag_moved = True
 
     def handle_shortcut(self, keysym, ctrl, shift):
         """Ctrl+1..9, Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Shift+D. Returns True when it was one of ours (so a terminal does not also send it)."""

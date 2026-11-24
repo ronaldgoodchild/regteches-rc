@@ -26,3 +26,15 @@ release/_tmp_data/
 release/marketing/*.png
 release/marketing/*.gif
 release/marketing/*.mp4
+workspaces.json
+identities.json
+proxies.json
+history.json
+recordings
+notes.json
+prefs.json
+session.json
+sync.json
+schemes.json
+sync_state.json
+*.rcsync

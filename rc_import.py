@@ -122,3 +122,58 @@ def default_xshell_folder():
             if os.path.isdir(cand):
                 return cand
     return best
+
+
+# ─── Devolutions Remote Desktop Manager ──────────────────────────────────────
+
+_RDM_HOST = ("host", "hostname", "computername", "server", "address", "url", "ipaddress")
+_RDM_USER = ("username", "user", "login")
+_RDM_PORT = ("port", "hostport", "sshport", "rdpport")
+
+
+def _rdm_find(d, names, depth=0):
+    """First non-empty value whose key (any case) is in `names`, looking one level into nested objects (RDM keeps settings in
+    sub-objects such as "RDP" or "SSH" depending on the version)."""
+    for k, v in d.items():
+        if isinstance(k, str) and k.lower() in names and isinstance(v, (str, int)) and str(v).strip():
+            return str(v).strip()
+    if depth < 2:
+        for v in d.values():
+            if isinstance(v, dict):
+                found = _rdm_find(v, names, depth + 1)
+                if found:
+                    return found
+    return ""
+
+
+def parse_rdm(text):
+    """Devolutions RDM JSON export (.rdm / .json: {"Connections": [...]} or a list) -> import items. Entries RC cannot open (folders,
+    web pages, credentials, documents) are skipped. Passwords are never read."""
+    import json
+    try:
+        data = json.loads((text or "").lstrip("﻿"))
+    except ValueError:
+        raise ValueError("That file is not a Devolutions export (it is not JSON).")
+    entries = data.get("Connections") if isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        raise ValueError("No connections were found in that file.")
+    out = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        ctype = str(e.get("ConnectionType") or e.get("Type") or "").lower()
+        kind = ("ssh" if "ssh" in ctype or "sftp" in ctype else "telnet" if "telnet" in ctype else "rdp" if "rdp" in ctype or "remotedesktop" in ctype
+                else "vnc" if "vnc" in ctype else "ftp" if "ftp" in ctype else None)
+        host = _rdm_find(e, _RDM_HOST)
+        host = re.sub(r"^[a-z]+://", "", host).split("/")[0]
+        if kind is None or not host or not str(e.get("Name") or "").strip():
+            continue
+        item = {"name": str(e["Name"]).strip(), "address": host.split(":")[0] if host.count(":") == 1 else host,
+                "user": _clean_user(_rdm_find(e, _RDM_USER)),
+                "port": _port(_rdm_find(e, _RDM_PORT) or (host.split(":")[1] if host.count(":") == 1 else ""), kind),
+                "group": str(e.get("Group") or "").replace("\\", " / ").strip(" /"), "kind": kind,
+                "source": "Devolutions RDM · " + kind.upper(), "note": str(e.get("Description") or "")[:200]}
+        if "sftp" in ctype:
+            item["mode"] = "SFTP"
+        out.append(item)
+    return out

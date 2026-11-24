@@ -27,6 +27,9 @@ from pyte import screens as _pscreens
 
 import rc_manager as core
 import rc_quick
+import rc_schemes
+import rc_suggest
+import rc_totp
 import rc_zmodem
 
 log = core.log
@@ -65,6 +68,8 @@ SCHEMES = {
                               "#000000 #cc3333 #33cc33 #cccc33 #3333cc #cc33cc #33cccc #33ff33 "
                               "#555555 #ff5555 #55ff55 #ffff55 #6666ff #ff55ff #55ffff #ccffcc"),
 }
+BUILTIN_SCHEMES = tuple(SCHEMES)
+CUSTOM_SCHEMES = rc_schemes.register(SCHEMES, BUILTIN_SCHEMES)        # the ones imported with View > Terminal colours
 DEFAULT_SCHEME = "Dark"
 FONT_DEFAULT_FAMILY = "Consolas"
 _NAMES = ["black", "red", "green", "brown", "blue", "magenta", "cyan", "white"]
@@ -108,7 +113,7 @@ def clean_prefs(data):
     return {"font_size": max(FONT_MIN, min(FONT_MAX, size)), "scrollback": max(500, min(200000, sb)),
             "scheme": scheme, "font": font.strip(), "copy_on_select": flag("copy_on_select", False),
             "right_click_paste": flag("right_click_paste", False), "middle_click_paste": flag("middle_click_paste", True),
-            "zmodem": flag("zmodem", True), "zmodem_dir": data.get("zmodem_dir") if isinstance(data.get("zmodem_dir"), str) else ""}
+            "zmodem": flag("zmodem", True), "log_timestamps": flag("log_timestamps", False), "line_numbers": flag("line_numbers", False), "zmodem_dir": data.get("zmodem_dir") if isinstance(data.get("zmodem_dir"), str) else ""}
 
 
 def load_prefs():
@@ -272,6 +277,17 @@ def style_colors(style, scheme=None):
 
 # ─── The terminal tab ────────────────────────────────────────────────────────
 
+def add_timestamps(text, at_line_start, now=None):
+    """Put [HH:MM:SS] at the start of every line of `text`. `at_line_start` says whether `text` begins a new line.
+    Returns (stamped text, whether the output now ends at the start of a line)."""
+    stamp = "[" + time.strftime("%H:%M:%S", time.localtime(now)) + "] "
+    out = []
+    for piece in text.splitlines(keepends=True):
+        out.append((stamp if at_line_start else "") + piece)
+        at_line_start = piece.endswith("\n")
+    return "".join(out), at_line_start
+
+
 class TerminalTab(ttk.Frame):
     AUTO_CONNECT = True  # tests switch this off
 
@@ -301,7 +317,9 @@ class TerminalTab(ttk.Frame):
         self.sb = 0  # scrollback lines held at the top of the Text widget
         self.styles = {}
         self.log_file = None
-
+        self.log_bol = True                 # the log is at the start of a line (for timestamps)
+        self.suggest = None                 # the open command-suggestion popup
+        self.tail, self.totp_last = "", 0.0  # recent output and when an authenticator code was last typed
         bar = ttk.Frame(self)
         if not playback:
             bar.pack(side="top", fill="x")
@@ -336,9 +354,15 @@ class TerminalTab(ttk.Frame):
                          selectbackground=self.scheme["sel"], exportselection=False, cursor="xterm")
         self.t._rc_fixed = True  # the terminal keeps its own colours in every theme
         sb = self.sbar = ttk.Scrollbar(self, command=self.t.yview)
-        self.t.configure(yscrollcommand=sb.set)
+        self.t.configure(yscrollcommand=self.on_yscroll)
         sb.pack(side="right", fill="y")
+        self.gutter = tk.Text(self, width=6, bg=self.scheme["bg"], fg="#7d8590", font=self.font, wrap="none", borderwidth=0, padx=4, pady=2,
+                              state="disabled", cursor="arrow", takefocus=0, highlightthickness=0, selectbackground=self.scheme["bg"])
+        self.gutter._rc_fixed = True
+        self.gutter.tag_configure("num", justify="right")
+        self.gutter_on = False
         self.t.pack(side="left", fill="both", expand=True)
+        self.apply_gutter()
         self.t.tag_configure("tcursor", background=self.scheme["cursor"], foreground=self.scheme["bg"])
         self.t.tag_configure("found", background="#e5c07b", foreground="#000000")
         self.t.bind("<Key>", self.on_key)
@@ -363,15 +387,15 @@ class TerminalTab(ttk.Frame):
             sbm.add_radiobutton(label=f"{n:,} lines", variable=self.sb_var, value=n, command=lambda n=n: self.set_scrollback(n))
         self.menu.add_cascade(label="Scrollback", menu=sbm)
         self.menu.add_separator()
-        sch = tk.Menu(self.menu, tearoff=0)
+        sch = tk.Menu(self.menu, tearoff=0, postcommand=lambda: self.fill_scheme_menu(sch))
         self.scheme_var = tk.StringVar(value=self.prefs["scheme"])
-        for name in SCHEMES:
-            sch.add_radiobutton(label=name, variable=self.scheme_var, value=name, command=lambda n=name: self.choose_scheme(n))
         self.menu.add_cascade(label="Colours", menu=sch)
         self.menu.add_command(label="Font…", command=self.choose_font)
         self.opt_vars = {}
         for key, label in (("copy_on_select", "Copy when I select text"), ("right_click_paste", "Right-click pastes (no menu)"),
-                           ("middle_click_paste", "Middle-click pastes"), ("zmodem", "Zmodem file transfers (rz / sz)")):
+                           ("middle_click_paste", "Middle-click pastes"), ("zmodem", "Zmodem file transfers (rz / sz)"),
+                           ("log_timestamps", "Timestamp every line in the log file"),
+                           ("line_numbers", "Show line numbers")):
             self.opt_vars[key] = tk.BooleanVar(value=self.prefs[key])
             self.menu.add_checkbutton(label=label, variable=self.opt_vars[key], command=lambda k=key: self.set_option(k))
         self.menu.add_separator()
@@ -819,10 +843,80 @@ class TerminalTab(ttk.Frame):
             self.recorder = None
             self.app.status.set(f"Recording saved: {path}")
 
+    def totp_secret(self):
+        blob = self.host.get("totp_secret_enc") or ""
+        try:
+            return core.unprotect_password(blob) if blob else ""
+        except Exception:
+            log.warning("could not open the authenticator secret for %s", self.host.get("name"))
+            return ""
+
+    def maybe_send_totp(self, text):
+        """If the server just asked for a verification code and this server has an authenticator secret, type the code (once per prompt)."""
+        self.tail = (self.tail + _ESC.sub("", text))[-300:]
+        if self.playback or self.kind != "ssh" or not self.host.get("totp_secret_enc") or not rc_totp.is_code_prompt(self.tail):
+            return
+        now = time.time()
+        if now - self.totp_last < 20:
+            return
+        secret = self.totp_secret()
+        if not secret:
+            return
+        self.totp_last, self.tail = now, ""
+        try:
+            self.send(rc_totp.fresh_code(secret) + "\r")
+            self.app.status.set("Typed the authenticator code for you")
+        except Exception:
+            log.warning("could not send the authenticator code", exc_info=True)
+
+    # ── command suggestions (Ctrl+Space) ──
+    def show_suggestions(self):
+        self.close_suggestions()
+        if self.screen.alt or self.playback:
+            return
+        typed = "" if self.history.unreliable else "".join(self.history.buf)
+        cmds = rc_suggest.suggestions_for(typed)
+        if not cmds:
+            self.app.status.set("No remembered commands match" if typed else "No commands remembered yet")
+            return
+        box = self.t.bbox("insert") or (0, 0, 0, 16)
+        x, y = self.t.winfo_rootx() + box[0], self.t.winfo_rooty() + box[1] + box[3] + 2
+        self.suggest = rc_suggest.SuggestPopup(self, cmds, x, y, lambda c: self.fill_line(typed, c))
+
+    def close_suggestions(self):
+        if self.suggest is not None:
+            self.suggest.close()
+            self.suggest = None
+
+    def fill_line(self, typed, cmd):
+        """Replace what is on the command line with `cmd` (not run). Ctrl+U clears the line in bash, zsh and most shells."""
+        self.suggest = None
+        clear = "\x15" if (typed or self.history.unreliable) else ""
+        self.send(clear + cmd)
+        self.history.buf, self.history.unreliable = list(cmd), False
+
+    def suggest_key(self, key):
+        """Keys while the suggestion list is open. Returns True when the key was used."""
+        pop = self.suggest
+        if key == "Up":
+            pop.move(-1)
+        elif key == "Down":
+            pop.move(1)
+        elif key in ("Return", "Tab"):
+            self.suggest = None
+            pop.choose()
+        elif key == "Escape":
+            self.close_suggestions()
+        else:
+            self.close_suggestions()
+            return False
+        return True
+
     def remote_data(self, text):
         if self.recorder:
             self.recorder.output(text)
         self.feed(text)
+        self.maybe_send_totp(text)
         if self.expect is not None:
             self.expect.feed(text)
 
@@ -844,7 +938,8 @@ class TerminalTab(ttk.Frame):
         note = lambda m: self.write_local(f"\r\n\x1b[36m[{m}]\x1b[0m\r\n")
         self.expect = rc_quick.ExpectRunner(
             steps, self.send, self.after, self.after_cancel, note,
-            subst=lambda t: rc_quick.substitute(t, user, self.host.get("address", ""), pw))
+            subst=lambda t: rc_quick.substitute(t, user, self.host.get("address", ""), pw,
+                                                rc_totp.fresh_code(self.totp_secret()) if "${totp}" in t and self.totp_secret() else ""))
         self.expect.start()
 
     def bcast_changed(self):
@@ -879,6 +974,11 @@ class TerminalTab(ttk.Frame):
         ctrl, shift = e.state & 0x4, e.state & 0x1
         alt = e.state & 0x20000
         key = e.keysym
+        if self.suggest is not None and self.suggest_key(key):
+            return "break"
+        if ctrl and key == "space":
+            self.show_suggestions()
+            return "break"
         handler = getattr(self.app, "handle_shortcut", None)
         if ctrl and handler and handler(key, True, bool(shift)):
             return "break"                                  # Ctrl+1..9 / Ctrl+Tab / Ctrl+Shift+D belong to the program, not the server
@@ -926,6 +1026,28 @@ class TerminalTab(ttk.Frame):
         for t in self.terminals_to_update():
             t.prefs = load_prefs()
 
+    def fill_scheme_menu(self, menu):
+        menu.delete(0, "end")
+        for name in SCHEMES:
+            menu.add_radiobutton(label=name, variable=self.scheme_var, value=name, command=lambda n=name: self.choose_scheme(n))
+        menu.add_separator()
+        menu.add_command(label="Import a colour scheme…", command=self.import_scheme)
+        custom = [n for n in SCHEMES if n not in BUILTIN_SCHEMES]
+        if custom:
+            rm = tk.Menu(menu, tearoff=0)
+            for name in custom:
+                rm.add_command(label=name, command=lambda n=name: self.remove_scheme(n))
+            menu.add_cascade(label="Remove an imported scheme", menu=rm)
+
+    def import_scheme(self):
+        names = rc_schemes.import_dialog(self, SCHEMES, BUILTIN_SCHEMES, SCHEMES[DEFAULT_SCHEME])
+        if names:
+            self.choose_scheme(names[0])
+
+    def remove_scheme(self, name):
+        if rc_schemes.remove_dialog(self, SCHEMES, BUILTIN_SCHEMES, name) and self.scheme_var.get() == name:
+            self.choose_scheme(DEFAULT_SCHEME)
+
     def choose_scheme(self, name):
         self.set_pref(scheme=name)
         for t in self.terminals_to_update():
@@ -953,6 +1075,49 @@ class TerminalTab(ttk.Frame):
 
     def set_option(self, key):
         self.set_pref(**{key: bool(self.opt_vars[key].get())})
+        if key == "line_numbers":
+            for t in self.terminals_to_update():
+                t.apply_gutter()
+
+    # ── line numbers ──
+    def on_yscroll(self, first, last):
+        self.sbar.set(first, last)
+        if self.gutter_on:
+            self.gutter.yview_moveto(first)
+
+    def apply_gutter(self):
+        want = bool(self.prefs.get("line_numbers"))
+        if want and not self.gutter_on:
+            self.gutter_on = True
+            self.gutter.pack(side="left", fill="y", before=self.t)
+            self.gutter.configure(font=self.font, bg=self.scheme["bg"])
+            self.gutter_count = 0
+            self.sync_gutter()
+        elif not want and self.gutter_on:
+            self.gutter_on = False
+            self.gutter.pack_forget()
+        if "line_numbers" in getattr(self, "opt_vars", {}):
+            self.opt_vars["line_numbers"].set(want)
+
+    def sync_gutter(self):
+        """Keep one number per line of the terminal text (scrollback and screen), counted from the top of what is kept."""
+        if not self.gutter_on:
+            return
+        total = int(self.t.index("end-1c").split(".")[0])
+        have = getattr(self, "gutter_count", 0)
+        if total == have:
+            return
+        g = self.gutter
+        g.configure(state="normal")
+        if total > have:
+            g.insert("end", "".join(("" if n == 1 else "\n") + str(n) for n in range(have + 1, total + 1)), "num")
+        else:
+            g.delete(f"{total}.end", "end")
+        g.configure(state="disabled")
+        self.gutter_count = total
+        digits = max(3, len(str(total)))
+        g.configure(width=digits + 1)
+        g.yview_moveto(self.t.yview()[0])
 
     def output_text(self):
         """Everything in the scrollback and on the screen as plain text."""
@@ -1021,7 +1186,10 @@ class TerminalTab(ttk.Frame):
             return  # tab was closed while output was still queued
         if self.log_file:
             try:
-                self.log_file.write(_ESC.sub("", data).replace("\r\n", "\n").replace("\r", ""))
+                plain = _ESC.sub("", data).replace("\r\n", "\n").replace("\r", "")
+                if self.prefs.get("log_timestamps"):
+                    plain, self.log_bol = add_timestamps(plain, self.log_bol)
+                self.log_file.write(plain)
                 self.log_file.flush()
             except (OSError, ValueError):
                 self.log_file = None
@@ -1080,6 +1248,7 @@ class TerminalTab(ttk.Frame):
             t.mark_set("insert", pos)
         if at_bottom:
             t.yview_moveto(1.0)
+        self.sync_gutter()
 
 
 class SplitTab(ttk.Frame):
@@ -1140,11 +1309,11 @@ class SplitTab(ttk.Frame):
         self.app.theme.paint(m)
         m.tk_popup(self.winfo_rootx() + 20, self.winfo_rooty() + 30)
 
-    def add_host(self, h):
+    def add_host(self, h, creds=None):
         if len(self.panes) >= self.MAX_PANES:
             messagebox.showinfo("Split view", f"A split view holds up to {self.MAX_PANES} terminals.", parent=self)
             return None
-        c = self.app.credentials(h)
+        c = creds or self.app.credentials(h)
         if not c:
             return None
         frame = ttk.Frame(self.area, relief="solid", borderwidth=1)

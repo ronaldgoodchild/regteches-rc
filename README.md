@@ -19,7 +19,7 @@ servers by mouse, group them, search them, and click the way in you want.
 
 **Install with Scoop:** `scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches` then `scoop install rc` (updates with `scoop update rc`; your servers are kept between updates).
 
-**Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_monitor.py` (live stats), `rc_identity.py` (identities and proxies), `rc_quick.py` (quick commands, history, login scripts), `rc_transport.py` (Telnet and Serial), `rc_backup.py` (backup), `rc_netscan.py` (network scan), `rc_localsrv.py` (TFTP/HTTP servers), `rc_import.py` (MobaXterm/Xshell import), `rc_record.py` (recording), `rc_notes.py` (notes), `rc_glances.py` (Glances), `rc_zmodem.py` (Zmodem), `rc_prefs.py` (preferences and remembered tabs), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys) and `rc_theme.py` - keep the eighteen together. (Serial also needs `pyserial`, in `requirements.txt`.) First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
+**Start it:** double-click `RC.bat` (or `python rc_manager.py`). The program is `rc_manager.py` plus `rc_terminal.py` (the SSH terminal), `rc_files.py` (file manager), `rc_monitor.py` (live stats), `rc_identity.py` (identities and proxies), `rc_quick.py` (quick commands, history, login scripts), `rc_transport.py` (Telnet and Serial), `rc_backup.py` (backup), `rc_netscan.py` (network scan), `rc_localsrv.py` (TFTP/HTTP servers), `rc_import.py` (MobaXterm/Xshell import), `rc_record.py` (recording), `rc_notes.py` (notes), `rc_glances.py` (Glances), `rc_zmodem.py` (Zmodem), `rc_prefs.py` (preferences and remembered tabs), `rc_sync.py` (folder sync), `rc_firewall.py` (firewall rules), `rc_capture.py` (packet capture), `rc_totp.py` (authenticator codes), `rc_schemes.py` (colour scheme import), `rc_suggest.py` (command suggestions), `rc_docker.py` (Docker page), `rc_cloud.py` (WebDAV and S3), `rc_hardware.py` (hardware and IPMI pages), `rc_tools.py` (palette, tunnels, snippets, key setup, trusted keys) and `rc_theme.py` - keep the twenty-seven together. (Serial also needs `pyserial`, in `requirements.txt`.) First time only: `pip install -r requirements.txt` (paramiko for SSH, pyte for the terminal).
 
 ## What's new since 2.0
 
@@ -199,6 +199,104 @@ missing and overwrite servers that match** (same id, or same name and address) o
 References (workspaces, jump servers) follow matched servers. A safety copy of the server list as it was is saved first
 (`hosts.json.before-restore-<time>`). Not in the backup: the SSH key *files* themselves (copy `~/.ssh` yourself; RC tells
 you how many servers use one), command history and settings.
+
+## Sync through a folder (File > Backup > Sync through a folder)
+
+Keeps servers, snippets, workspaces, identities, proxies, notes and trusted host keys the same on several PCs. Pick a folder
+all of them can reach (OneDrive, Dropbox, a network share, a USB stick), type the **same sync password** on each PC, and click
+**Sync now**. Tick *Sync automatically* to sync when RC starts and when it closes (File > Backup > Sync now does it on demand).
+Each PC writes its own encrypted file (`RC-sync-<pc>-<id>.rcsync`, scrypt + AES-256-GCM) and only reads the others', so the
+cloud service never creates "conflicted copy" files. Saved passwords travel inside the locked file and are re-encrypted for each
+PC's Windows account. The newest change to a record wins; deleting a server on one PC deletes it on the others (a "deleted" marker
+is kept for 90 days). On the first sync of a PC, records already in the folder win over that PC's copy. Not synced: SSH key files
+themselves, command history, preferences and each PC's last-used file folder. If a file shows "different sync password", the PCs
+are not using the same password and that file was skipped.
+
+## Firewall and packet capture (Stats tab)
+
+Two extra pages in a server's **Stats** tab (not shown for servers read through Glances, which has no SSH login).
+
+**Firewall** finds which firewall the server uses and lists its rules. **ufw**: add an allow/deny/reject/limit rule for a port
+(or range, optionally only from one IP or network), delete a rule, turn ufw on or off. **firewalld**: list the default zone's
+ports and services, add or remove a port permanently (and reload). **nftables / iptables**: shown as text, read-only. Every
+change asks first, and RC warns when it would block the SSH port it is using, delete the only rule that allows it, or turn ufw on
+without one. Without root, commands use `sudo -n` (passwordless sudo); if that is missing RC says so.
+
+**Capture** runs `tcpdump` on the server over the existing SSH connection. Pick an interface (or `any`), an optional filter
+(`port 443`, `host 10.0.0.5 and tcp`), and when to stop (packets or seconds, whichever comes first). **Show packets** fills a
+table (time, protocol, source, destination, details) that you can save as text; **Record to a .pcap file** streams the raw
+capture to a file on this PC for Wireshark. The filter only accepts plain filter characters and is quoted, so it cannot run other
+commands. tcpdump must be installed on the server and needs root or passwordless sudo.
+
+## Two-step logins, suggestions and colour schemes
+
+**Authenticator codes (Edit server > Login > Authenticator secret).** For servers that use Google Authenticator / any TOTP app
+for SSH. Paste the secret key shown when the 2-step login was set up (or the `otpauth://` link); RC saves it encrypted like a
+password (this Windows account only; it is carried in backups and sync like a password) and never shows it again. When you
+connect, RC answers the server's password prompt and its "Verification code" prompt itself. Later code prompts in the terminal
+(for example a second step in `sudo`) get the current code typed once per prompt, and login scripts can use `${totp}`.
+Works with password + code and with key + code. Anyone holding the secret can make your codes, so guard it like a password.
+
+**Command suggestions.** In a terminal press **Ctrl+Space** for a list of remembered commands (the Quick panel's History) that
+start with what you have typed, then ones that contain it, most-used and most recent first. Up/Down choose, Enter or Tab fills
+the line (it is not run: press Enter), Escape closes. If you edited the line with arrow keys or Tab, RC cannot see it and shows
+your most recent commands instead; the line is cleared with Ctrl+U first, which bash, zsh and most shells understand.
+
+**Colour schemes.** View > Terminal colours (and a terminal's right-click > Colours) now has **Import a colour scheme…**:
+iTerm2 `.itermcolors`, a Windows Terminal scheme or whole `settings.json`, or a simple JSON `{"name", "background",
+"foreground", "colors": [16 colours]}`. Missing colours are filled from the Dark scheme. Imported schemes are kept in
+`schemes.json` and can be removed from the same menu. **Timestamps:** right-click > *Timestamp every line in the log file* puts
+`[HH:MM:SS]` in front of each line of a "Log to file" log (the screen itself is unchanged).
+
+## File manager extras, Docker page, Devolutions import
+
+**Files.** Type the first letters of a file name in either pane to jump to it (typing the same letter again moves to the next
+file starting with it; a pause starts over). **Symbolic links** are marked 🔗 and the **Links to** column shows where each one points;
+right-click > **New symbolic link…** makes one in the current folder (SFTP and this PC; FTP has none; on this PC Windows may
+need Developer Mode or an administrator account). Right-click > **Columns** chooses which of Size, Modified and Links to are shown
+(remembered for both panes).
+
+**Docker (Stats tab).** Lists the containers on a server with state, CPU, memory, image and ports; select one to start, stop,
+restart, remove or read its logs (double-click). Uses `docker` over SSH, retrying with `sudo -n` when the login may not use Docker.
+Stop, restart and remove ask first. Not shown for Glances-only servers (their Containers page comes from Glances).
+
+**Devolutions Remote Desktop Manager.** File > Import servers > *From Devolutions Remote Desktop Manager* reads an RDM JSON export
+(.rdm / .json) and offers its SSH, SFTP, Telnet, RDP, VNC and FTP entries in the usual import list (folders become groups).
+Passwords are never imported. The export format differs a little between RDM versions, so RC reads the common field names;
+check the list before importing.
+
+## WebDAV and S3 in the file manager
+
+In Edit server > Connections set **File transfer** to **WebDAV** (http), **WebDAVS** (https), **S3** (https) or **S3 (http)** (no TLS,
+for example MinIO on port 9000), then use the usual **Files** button: same two panes, drag and drop, queue, sync and editor.
+The username and password are used as the login (for S3: the access key id and the secret key).
+
+*WebDAV* covers Nextcloud / ownCloud, NAS WebDAV services, Apache and others: browse, upload, download, new folder, rename,
+server-side copy, delete. Type the starting folder in the path box once (Nextcloud: `/remote.php/dav/files/<user>/`); RC remembers it.
+*S3* covers Amazon S3, MinIO, Wasabi, Backblaze B2, Ceph and S3-compatible NAS boxes: the top level lists your buckets, folders are key
+prefixes, you can make and delete buckets and folders, copy files and folders on the server, and rename files (S3 cannot rename a
+folder: copy it, then delete the old one). Set the **S3 region** on the same tab when it is not `us-east-1`. Requests are signed
+with AWS Signature V4 and use path-style addresses. As with FTPS, https certificates are not checked, so self-signed servers work.
+There are no file permissions on these servers, so Properties cannot change them. SCP is not added: servers with SCP also offer SFTP.
+
+## Hardware and IPMI pages (Stats tab)
+
+**Hardware** reads the server's temperature sensors and fans straight from the kernel (nothing to install), sorted hottest first and
+coloured when a sensor is near its own limit (or above 80 / 90 °C when it reports none), plus the machine and CPU details. **Check
+disk health (SMART)** runs `smartctl` (package smartmontools) on each disk and shows health, temperature, power-on hours,
+reallocated and pending sectors, and SSD wear; a failing disk is red. It needs root: without it RC uses `sudo -n` and says so if that
+is missing. **IPMI** shows a server's management-controller sensors, event log and chassis status through `ipmitool`; PCs normally have
+no IPMI and the page says so. Both pages only read; they change nothing on the server. Neither is shown for Glances-only servers.
+
+## Line numbers, and moving a tab into a split view
+
+**Line numbers.** Right-click a terminal > *Show line numbers* puts a number column beside the text (every terminal; remembered).
+The numbers count the lines RC keeps (the scrollback and the screen), starting from the top of what is kept, so they are for
+finding your place in a long output, not the server's own line numbers. Timestamps are available as `[HH:MM:SS]` in log files (*Timestamp every line in the log file*).
+
+**Split from a tab.** Right-click an SSH tab > *Move into a split view*, or drag the tab down into the window and let go, to turn it into a
+pane of a split view (a new one, or an existing one: RC asks when there are several). The session is opened again in the pane with the
+same login, and the old tab is closed, because a running connection cannot move between windows. Locked tabs stay where they are.
 
 ## Network scan (Tools > Network > Network scan)
 

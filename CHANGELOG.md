@@ -3,6 +3,49 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.19.0
+
+**New**
+- **Line numbers** in the terminal (right-click > Show line numbers).
+- **Move a terminal tab into a split view**: from the tab's right-click menu, or by dragging the tab down into the window.
+
+## 2.18.0
+
+**New**
+- **Hardware page** in the Stats tab (`rc_hardware.py`): temperatures, fans, machine and CPU details, and on request SMART disk health.
+- **IPMI page**: sensors, event log and chassis status through ipmitool.
+
+## 2.17.0
+
+**New**
+- **WebDAV, WebDAVS and S3** in the file manager (`rc_cloud.py`): choose them under *File transfer*; browse, transfer, copy, rename and delete
+  on Nextcloud-style WebDAV servers and S3-compatible storage (buckets, folders as prefixes, AWS Signature V4).
+- S3 region field in Edit server > Connections.
+
+## 2.16.0
+
+**New**
+- **Files:** type-ahead in both panes, symbolic links shown (🔗, "Links to" column) and created (right-click), choosable columns.
+- **Docker page** in the Stats tab (`rc_docker.py`): containers over SSH with start / stop / restart / remove / logs.
+- **Import from Devolutions Remote Desktop Manager** (JSON export).
+
+## 2.15.0
+
+**New**
+- **Authenticator (TOTP) logins** (`rc_totp.py`): save a server's authenticator secret and RC answers the password and verification
+  code prompts of a two-step SSH login, types the code at later code prompts, and offers `${totp}` in login scripts.
+- **Command suggestions** (`rc_suggest.py`): Ctrl+Space in a terminal lists matching commands from your history.
+- **Colour scheme import** (`rc_schemes.py`): iTerm2, Windows Terminal and simple JSON schemes; removable.
+- Optional `[HH:MM:SS]` timestamps in terminal log files.
+
+## 2.14.0
+
+**New**
+- **Firewall page** in the Stats tab (`rc_firewall.py`): ufw rules (add, delete, on/off) and firewalld ports/services over SSH, nftables and
+  iptables as read-only text, with lock-out warnings before anything that could cut the SSH connection.
+- **Capture page** in the Stats tab (`rc_capture.py`): tcpdump over SSH, shown live in a table or recorded to a `.pcap` for Wireshark,
+  with packet and time limits so a capture always ends.
+
 ## 2.13.1
 
 **New**
@@ -17,6 +60,9 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 ## 2.13.0
 
 **New**
+- **Folder sync** (`rc_sync.py`, File > Backup > Sync through a folder): servers, snippets, workspaces, identities, proxies, notes and
+  trusted host keys stay the same on several PCs through a shared folder. One encrypted file per PC (no conflicted copies), newest
+  change per record wins, deletions propagate, optional automatic sync at start and exit.
 - **Deep scan: all ports.** In the Network scan, **Scan more ports on this machine…** (and the Ports box when one address is scanned) accepts `all` to try every port 1-65535 on that one machine, with progress and a Stop button that keeps what was found.
 
 **Removed**

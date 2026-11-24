@@ -72,6 +72,39 @@ def sort_entries(entries, col="name", reverse=False, show_hidden=True, needle=""
     return dirs + files
 
 
+FILE_COLUMNS = ("size", "modified", "link")
+COLUMN_LABELS = {"size": "Size", "modified": "Modified", "link": "Links to"}
+TYPE_AHEAD_RESET = 1.0       # seconds without typing before the typed letters start over
+
+
+def type_ahead_match(names, typed, current=-1):
+    """Index of the entry to select when `typed` letters have been typed: the first name starting with them (case-insensitive),
+    looking after `current` first when the same single letter is pressed again (so a letter cycles through its files).
+    None if nothing matches."""
+    t = (typed or "").lower()
+    if not t:
+        return None
+    n = len(names)
+    start = current + 1 if (len(t) > 0 and len(set(t)) == 1 and 0 <= current < n and names[current].lower().startswith(t[0])) else 0
+    for k in range(n):
+        i = (start + k) % n
+        if names[i].lower().startswith(t):
+            return i
+    if len(set(t)) == 1:                    # "aaa" cycling: fall back to the single letter
+        for k in range(n):
+            i = (start + k) % n
+            if names[i].lower().startswith(t[0]):
+                return i
+    return None
+
+
+def clean_columns(value):
+    """The saved list of visible columns -> a list of known names, in display order (default: size and modified)."""
+    if not isinstance(value, (list, tuple)):
+        return ["size", "modified"]
+    return [c for c in FILE_COLUMNS if c in value]
+
+
 # ─── this PC ─────────────────────────────────────────────────────────────────
 
 class LocalBackend:
@@ -91,15 +124,21 @@ class LocalBackend:
         return os.path.expanduser("~")
 
     def listdir(self, path):
-        out = []
+        out, links = [], {}
         with os.scandir(path) as it:
             for e in it:
                 try:
                     st = e.stat()
                     out.append((e.name, e.is_dir(), 0 if e.is_dir() else st.st_size, st.st_mtime))
+                    if e.is_symlink():
+                        links[e.name] = os.readlink(e.path).removeprefix("\\\\?\\")      # Windows adds \\?\ to the path
                 except OSError:
                     continue
+        self.last_links = links
         return out
+
+    def symlink(self, target, path):
+        os.symlink(target, path, target_is_directory=os.path.isdir(target))
 
     def stat(self, path):
         try:
@@ -240,7 +279,8 @@ class Pane(ttk.Frame):
         super().__init__(tab.panes)
         self.tab, self.side, self.backend, self.lock = tab, side, backend, lock
         self.path, self.history, self.hpos, self.token = "", [], -1, 0
-        self.raw, self.entries = [], {}
+        self.raw, self.entries, self.links = [], {}, {}
+        self.typed, self.typed_at = "", 0.0
         bar = ttk.Frame(self)
         bar.pack(fill="x")
         title = "This PC" if side == "local" else tab.host["name"]
@@ -264,12 +304,15 @@ class Pane(ttk.Frame):
         ttk.Label(bar2, text="🔍").pack(side="left", padx=(6, 0))
         ttk.Entry(bar2, textvariable=self.filter_var, width=12).pack(side="left")
         self.filter_var.trace_add("write", lambda *_: self.render())
-        self.tree = ttk.Treeview(self, columns=("size", "modified"), selectmode="extended", height=14)
+        self.tree = ttk.Treeview(self, columns=("size", "modified", "link"), selectmode="extended", height=14)
         for col, key in (("#0", "name"), ("size", "size"), ("modified", "modified")):
             self.tree.heading(col, text={"name": "Name", "size": "Size", "modified": "Modified"}[key], command=lambda k=key: self.sort_by(k))
+        self.tree.heading("link", text="Links to")
         self.tree.column("#0", width=230)
         self.tree.column("size", width=70, anchor="e")
         self.tree.column("modified", width=115)
+        self.tree.column("link", width=160)
+        self.apply_columns()
         sb = ttk.Scrollbar(self, command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         self.status = tk.StringVar()
@@ -280,6 +323,7 @@ class Pane(ttk.Frame):
         self.tree.bind("<Return>", self.on_open)
         self.tree.bind("<BackSpace>", lambda e: self.up())
         self.tree.bind("<Delete>", lambda e: tab.delete())
+        self.tree.bind("<Key>", self.on_type, add="+")
         self.tree.bind("<Button-3>", self.context_menu)
         self.tree.bind("<Control-a>", lambda e: (self.tree.selection_set(self.tree.get_children()), "break")[1])
         self.tree.bind("<Control-c>", lambda e: (tab.clip_set(self, cut=False), "break")[1])
@@ -305,9 +349,10 @@ class Pane(ttk.Frame):
             try:
                 with self.lock:
                     entries = self.backend.listdir(path)
+                    links = dict(getattr(self.backend, "last_links", None) or {})
                 err = None
             except Exception as e:
-                entries, err = None, str(e) or e.__class__.__name__
+                entries, links, err = None, {}, str(e) or e.__class__.__name__
 
             def done():
                 if token != self.token or self.tab.closed or (quiet and self.path != path):
@@ -316,7 +361,7 @@ class Pane(ttk.Frame):
                     self.status.set("Error: " + err)
                     messagebox.showerror("Files", f"Can't open {path}:\n{err}")
                     return
-                self.path, self.raw = path, entries
+                self.path, self.raw, self.links = path, entries, links
                 self.path_var.set(path)
                 if push:
                     del self.history[self.hpos + 1:]
@@ -332,14 +377,55 @@ class Pane(ttk.Frame):
         self.entries = {}
         flt = self.filter_var.get().lower()
         for e in sort_entries(self.raw, self.sort_col, self.sort_rev, self.show_hidden.get(), flt):
-            iid = self.tree.insert("", "end", text=("📁 " if e[1] else "📄 ") + e[0],
-                                   values=("" if e[1] else core.fmt_size(e[2]), stamp(e[3])))
+            iid = self.tree.insert("", "end", text=("🔗 " if e[0] in self.links else "📁 " if e[1] else "📄 ") + e[0],
+                                   values=("" if e[1] else core.fmt_size(e[2]), stamp(e[3]), self.links.get(e[0], "")))
             self.entries[iid] = e
         hidden = self.show_hidden.get()
         self.status.set(f"{len(self.raw)} items" + (f" ({len(self.entries)} shown)" if flt or not hidden else ""))
         for col, key, label in (("#0", "name", "Name"), ("size", "size", "Size"), ("modified", "modified", "Modified")):
             self.tree.heading(col, text=label + ((" ▼" if self.sort_rev else " ▲") if key == self.sort_col else ""))
         self.render_crumbs()
+
+    def columns(self):
+        prefs = getattr(self.tab.app, "prefs", None)
+        return clean_columns(prefs.get("file_columns") if isinstance(prefs, dict) else None)
+
+    def apply_columns(self):
+        self.tree.configure(displaycolumns=self.columns())
+
+    def toggle_column(self, name):
+        cols = self.columns()
+        cols = [c for c in cols if c != name] if name in cols else [c for c in FILE_COLUMNS if c in cols or c == name]
+        prefs = getattr(self.tab.app, "prefs", None)
+        if isinstance(prefs, dict):
+            prefs["file_columns"] = cols
+            try:
+                import rc_prefs
+                rc_prefs.save(prefs)
+            except Exception:
+                core.log.warning("could not save the file columns", exc_info=True)
+        for pane in (getattr(self.tab, "local", None), getattr(self.tab, "remote", None)):
+            if pane is not None:
+                pane.apply_columns()
+
+    def on_type(self, e):
+        """Type a few letters to jump to the file that starts with them (letters start over after a second)."""
+        if e.state & 0x4 or e.state & 0x20000 or len(e.char) != 1 or not e.char.isprintable() or (e.char == " " and not self.typed):
+            return None
+        now = time.time()
+        if now - self.typed_at > TYPE_AHEAD_RESET:
+            self.typed = ""
+        self.typed, self.typed_at = self.typed + e.char, now
+        rows = list(self.tree.get_children())
+        names = [self.entries[i][0] for i in rows]
+        cur = rows.index(self.tree.selection()[0]) if self.tree.selection() and self.tree.selection()[0] in rows else -1
+        hit = type_ahead_match(names, self.typed, cur)
+        if hit is not None:
+            self.tree.selection_set(rows[hit])
+            self.tree.focus(rows[hit])
+            self.tree.see(rows[hit])
+            self.status.set(f"Jumped to “{names[hit]}” (typed: {self.typed})")
+        return "break"
 
     def render_crumbs(self):
         for w in self.crumbs.winfo_children():
@@ -521,6 +607,9 @@ class FilesTab(ttk.Frame):
         port = int(host.get("file_port") or core.DEFAULT_FILE_PORT[mode])
         if mode == "SFTP":
             return core.SftpBackend(core.open_ssh_client(self.app, dict(host, ssh_port=port), self.user, self.password))
+        if mode in core.CLOUD_FILE_MODES:
+            import rc_cloud
+            return rc_cloud.open_backend(host, port, self.user, self.password)
         return core.FtpBackend(core.open_ftp(host, port, self.user, self.password))
 
     def connect(self):
@@ -614,6 +703,27 @@ class FilesTab(ttk.Frame):
         if name and name.strip():
             b = pane.backend
             self.call(pane, "Creating file ...", lambda: b.touch(b.join(pane.path, name.strip())), lambda _: pane.refresh())
+
+    def new_link(self, pane):
+        b = pane.backend
+        if not hasattr(b, "symlink"):
+            messagebox.showinfo("Files", "This kind of connection cannot make symbolic links.", parent=self)
+            return
+        sel = pane.selected()
+        default = b.join(pane.path, sel[0][0]) if len(sel) == 1 else ""
+        target = simpledialog.askstring("New symbolic link", "What should the link point to (a path)?", initialvalue=default, parent=self)
+        if not target or not target.strip():
+            return
+        name = simpledialog.askstring("New symbolic link", "Name of the link (made in this folder):",
+                                      initialvalue=(sel[0][0] + "-link") if len(sel) == 1 else "", parent=self)
+        if not name or not name.strip() or "/" in name or "\\" in name:
+            if name and name.strip():
+                messagebox.showinfo("Files", "Give the link a plain name, without slashes.", parent=self)
+            return
+
+        def work():
+            b.symlink(target.strip(), b.join(pane.path, name.strip()))
+        self.call(pane, "Creating the link ...", work, lambda _: pane.refresh())
 
     def clip_set(self, pane, cut=False):
         sel = pane.selected()
@@ -715,6 +825,8 @@ class FilesTab(ttk.Frame):
             m.add_command(label="Rename  F2", command=self.rename)
         m.add_command(label="📁 New folder  F7", command=self.mkdir)
         m.add_command(label="📄 New file", command=self.new_file)
+        m.add_command(label="🔗 New symbolic link…", command=lambda: self.new_link(pane),
+                      state=tk.NORMAL if hasattr(pane.backend, "symlink") else tk.DISABLED)
         if sel:
             m.add_command(label="🗑 Delete  F8", command=self.delete)
             m.add_command(label="🔒 Properties", command=self.properties)
@@ -726,6 +838,14 @@ class FilesTab(ttk.Frame):
         m.add_separator()
         m.add_command(label="Select all  Ctrl+A", command=lambda: pane.tree.selection_set(pane.tree.get_children()))
         m.add_checkbutton(label="Show hidden files (.name)", variable=pane.show_hidden, command=pane.render)
+        cm = tk.Menu(m, tearoff=0)
+        shown = pane.columns()
+        cm._vars = []                       # keep the variables alive as long as the menu
+        for c in FILE_COLUMNS:
+            v = tk.BooleanVar(value=c in shown)
+            cm._vars.append(v)
+            cm.add_checkbutton(label=COLUMN_LABELS[c], variable=v, command=lambda c=c: pane.toggle_column(c))
+        m.add_cascade(label="Columns", menu=cm)
         m.add_command(label="⟳ Refresh", command=pane.refresh)
         return m
 

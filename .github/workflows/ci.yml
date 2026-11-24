@@ -23,6 +23,6 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Compile
-        run: python -m py_compile rc_manager.py rc_terminal.py rc_files.py rc_tools.py rc_theme.py
+        run: python -m py_compile rc_manager.py rc_terminal.py rc_monitor.py rc_identity.py rc_quick.py rc_transport.py rc_backup.py rc_netscan.py rc_localsrv.py rc_import.py rc_record.py rc_notes.py rc_glances.py rc_zmodem.py rc_prefs.py rc_sync.py rc_firewall.py rc_capture.py rc_totp.py rc_schemes.py rc_suggest.py rc_docker.py rc_cloud.py rc_hardware.py rc_files.py rc_tools.py rc_theme.py
       - name: Unit tests
         run: python -m unittest discover -s tests -v

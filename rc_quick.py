@@ -216,8 +216,9 @@ class ExpectRunner:
         self.note(f"login script stopped: “{wait}” did not appear within {self.timeout:g} s")
 
 
-def substitute(text, user, host, password):
-    return text.replace("${user}", user or "").replace("${host}", host or "").replace("${password}", password or "")
+def substitute(text, user, host, password, totp=""):
+    return (text.replace("${user}", user or "").replace("${host}", host or "").replace("${password}", password or "")
+            .replace("${totp}", totp or ""))
 
 
 # ─── the panel ───────────────────────────────────────────────────────────────
