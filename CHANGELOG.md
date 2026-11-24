@@ -46,12 +46,27 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 - **Capture page** in the Stats tab (`rc_capture.py`): tcpdump over SSH, shown live in a table or recorded to a `.pcap` for Wireshark,
   with packet and time limits so a capture always ends.
 
+## 2.13.1
+
+**New**
+- **A web manual** (`docs/`, also shipped as the `manual` folder next to `RC.exe`): a web page with a menu bar, a contents list with search, pictures of every screen, a video demonstration, a first-five-minutes guide, a walk through each menu, how to add servers and use every feature, shortcuts, where RC keeps its files, and a help / FAQ section. All pictures and the video use sample data.
+- **Help > Manual (web page)** opens it (the local copy if present, otherwise the online page).
+- The picture and video tools used to make it (`release/capture_manual.py`, `release/demo_env.py`).
+
+**Changed**
+- The README's "What's new" section now covers everything since 2.0, and `QUICK START.txt` covers the newer features and the manual.
+- Version history note: a short-lived 2.1.0 build published on GitHub in November 2026 contained a one-file settings export (`.rcpack`). It was replaced by the encrypted **Backup and restore** (2.7.0) and is not part of the later versions. The 2.1.0 entry below lists what 2.1.0 means in the current source (split view, broadcast and so on).
+
 ## 2.13.0
 
 **New**
 - **Folder sync** (`rc_sync.py`, File > Backup > Sync through a folder): servers, snippets, workspaces, identities, proxies, notes and
   trusted host keys stay the same on several PCs through a shared folder. One encrypted file per PC (no conflicted copies), newest
   change per record wins, deletions propagate, optional automatic sync at start and exit.
+- **Deep scan: all ports.** In the Network scan, **Scan more ports on this machine…** (and the Ports box when one address is scanned) accepts `all` to try every port 1-65535 on that one machine, with progress and a Stop button that keeps what was found.
+
+**Removed**
+- The old stand-alone `netscan.py` script (the built-in scan replaces it).
 
 ## 2.12.0
 
@@ -62,6 +77,7 @@ About box, guide page, log file, `RC.exe` file properties and the release file n
 - RC remembers the open SSH / Files / Stats / Telnet / Serial tabs on exit (optional) and reopens them on the next start.
 
 **Fixed**
+- RC no longer stops at start-up on Python builds whose Tk does not know the key name `ISO_Left_Tab` (Ctrl+Shift+Tab now also uses `Control-Shift-Tab`).
 - The background status check ignored a server's proxy, so servers reachable only through a proxy always showed red.
 
 ## 2.11.0

@@ -2237,7 +2237,11 @@ class App:
         for d in "123456789":
             root.bind(f"<Control-Key-{d}>", lambda e, d=d: self.handle_shortcut(d, True, False) and "break")
         root.bind("<Control-Tab>", lambda e: self.handle_shortcut("Tab", True, False) and "break")
-        root.bind("<Control-ISO_Left_Tab>", lambda e: self.handle_shortcut("ISO_Left_Tab", True, True) and "break")
+        for seq in ("<Control-Shift-Tab>", "<Control-ISO_Left_Tab>"):  # not every Tk build knows ISO_Left_Tab (Python 3.11 on Windows does not)
+            try:
+                root.bind(seq, lambda e: self.handle_shortcut("ISO_Left_Tab", True, True) and "break")
+            except tk.TclError:
+                log.info("This Tk does not understand %s; the other Ctrl+Shift+Tab binding is used", seq)
         root.bind("<Control-Shift-D>", lambda e: self.handle_shortcut("D", True, True) and "break")
         root.protocol("WM_DELETE_WINDOW", self.on_exit)
         self.drag_tab = None
@@ -2755,7 +2759,8 @@ class App:
         tools.add_command(label="📄 Open the log file", command=self.open_log)
         bar.add_cascade(label="Tools", menu=tools)
         help_m = tk.Menu(bar, tearoff=0)
-        help_m.add_command(label="\U0001f4d6 Quick start guide (README)", command=self.open_readme)
+        help_m.add_command(label="\U0001f4d6 Manual (web page)", command=self.open_manual)
+        help_m.add_command(label="Quick start guide (README)", command=self.open_readme)
         help_m.add_command(label="Keyboard shortcuts", command=self.show_shortcuts)
         help_m.add_command(label=f"ℹ About {COMPANY} RC", command=self.about)
         bar.add_cascade(label="Help", menu=help_m)
@@ -3080,6 +3085,21 @@ class App:
                         pass
         messagebox.showinfo("Quick start", "Add a server with the \u2795 Add button, pick it from the list, then click "
                             "how you want to connect (SSH, Files, Remote Desktop, Web ...).", parent=self.root)
+
+    MANUAL_URL = "https://ronaldgoodchild.github.io/regteches-rc/"
+
+    def open_manual(self):
+        """Help > Manual: the web manual (pictures, video, every menu explained). Opens the copy that ships next to the
+        program (manual/index.html, or docs/index.html when running from source); with none, the web address."""
+        for folder in ("manual", "docs"):
+            page = os.path.join(PROGRAM_DIR, folder, "index.html")
+            if os.path.isfile(page):
+                try:
+                    webbrowser.open("file:///" + page.replace(os.sep, "/"))
+                    return
+                except Exception:
+                    log.exception("Could not open the local manual")
+        webbrowser.open(self.MANUAL_URL)
 
     def about(self):
         win = tk.Toplevel(self.root)
