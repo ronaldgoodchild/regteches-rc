@@ -50,6 +50,11 @@ for name, kb, days in (("website", 0, 2), ("backups", 0, 5), ("scripts", 0, 9), 
     os.utime(p, (now - days * 86400, now - days * 86400))
 rc_files.LocalBackend.home = lambda self: LOCAL
 
+# no real Windows user or PC name in any picture (the Keys tab shows "<home>\.ssh\rc_homelab_<PC name>")
+import socket
+socket.gethostname = lambda: "OFFICE-PC"
+os.environ["USERPROFILE"] = r"C:\Users\you"
+
 
 class FakeRemote:
     kind = "sftp"

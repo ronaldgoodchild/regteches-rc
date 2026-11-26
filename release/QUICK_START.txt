@@ -54,8 +54,13 @@ WHAT ELSE CAN IT DO?  (everything is in the menus)
   File         import from PuTTY, WinSCP, MobaXterm, Xshell or a CSV;
                Backup = one password-locked file to move everything,
                saved passwords included, to another PC
-  Terminal     right-click for colours, font, Zmodem and more; the
-               Quick button has your commands and history
+  Terminal     right-click for colours, font, line numbers, Zmodem
+               and more; the Quick button has your commands and
+               history; Ctrl+Space suggests commands
+  Stats        live CPU / memory / disks, Docker containers,
+               hardware and IPMI sensors, firewall rules, packet
+               capture
+  Storage      Files also opens WebDAV (Nextcloud) and S3 storage
 
 FILES THAT RC CREATES NEXT TO RC.EXE
   hosts.json     your servers (passwords are encrypted for your Windows

@@ -47,6 +47,9 @@ for name, kb, days in (("website", 0, 2), ("backups", 0, 5), ("scripts", 0, 9), 
             f.truncate(kb * 1024)
     os.utime(p, (now - days * 86400, now - days * 86400))
 rc_files.LocalBackend.home = lambda self: LOCAL
+import socket
+socket.gethostname = lambda: "OFFICE-PC"      # no real PC or user name in any picture
+os.environ["USERPROFILE"] = r"C:\Users\you"
 
 
 class FakeRemote:
@@ -291,13 +294,13 @@ try:
 except Exception as e:
     print("quick connect skipped:", e)
 
-menu_shot(4, "zz_warmup")      # the first menu open after a popup closes is unreliable (focus): throw this one away
+menu_shot(5, "zz_warmup")      # the first menu open after a popup closes is unreliable (focus): throw this one away
 try:
     os.remove(os.path.join(OUT, "zz_warmup.png"))
 except OSError:
     pass
-menu_shot(3, "10_servers_menu", 1.8)
-menu_shot(4, "11_tools_menu", 1.8)
+menu_shot(2, "10_servers_menu", 1.8)
+menu_shot(5, "11_tools_menu", 1.8)
 
 # colour themes: whole window in each theme
 pick("docker-host")

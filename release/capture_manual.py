@@ -236,6 +236,16 @@ try:
     tab.toggle_panel()
     play(1.5, "⚡ Quick commands and History: click to run, paste or copy")
     E.shot("m05_quick_panel")
+    tab.toggle_panel()
+    play(0.4, "Line numbers: right-click the terminal to show them")
+    tab.term.set_pref(line_numbers=True) if hasattr(tab, "term") else tab.set_pref(line_numbers=True)
+    for t in ([tab.term] if hasattr(tab, "term") else [tab]):
+        t.apply_gutter()
+    play(1.5)
+    E.shot("m04b_line_numbers")
+    for t in ([tab.term] if hasattr(tab, "term") else [tab]):
+        t.set_pref(line_numbers=False)
+        t.apply_gutter()
 except Exception as e:
     print("quick panel:", e)
 clean()
@@ -317,6 +327,89 @@ try:
     E.shot("m08_stats")
 except Exception as e:
     print("stats:", e)
+
+# the other Stats pages: the commands they would send over SSH are answered here with made-up output
+import rc_capture
+import rc_docker
+import rc_firewall
+import rc_hardware
+
+
+def fake_output(command):
+    if command == rc_firewall.DETECT_COMMAND:
+        return "@@uid\n0\n@@tools\nufw\niptables\n@@end"
+    if command == rc_capture.DETECT_COMMAND:
+        return "@@uid\n0\n@@tool\n/usr/bin/tcpdump\n@@timeout\n/usr/bin/timeout\n@@ifaces\neth0\nlo\ndocker0\n@@end"
+    if command == rc_hardware.IPMI_COMMAND:
+        return "@@uid\n0\n@@tool\n/usr/bin/ipmitool\n@@end"
+    if command == rc_hardware.HW_COMMAND:
+        return ("@@uid\n0\n@@dmi\nsys_vendor=Demo Systems\nproduct_name=Rack Server R200\nboard_name=DS-R200\nbios_version=2.4.1\n"
+                "bios_date=03/14/2026\n@@cpu\nModel name: 8-core x86 processor\nCPU(s): 8\n@@thermal\nx86_pkg_temp|52000\nacpitz|34000\n"
+                "@@hwmon\ncoretemp|Core 0|49000|100000|84000\ncoretemp|Core 1|51000|100000|84000\ncoretemp|Core 2|81000|100000|84000\n"
+                "nvme|Composite|41000|85000|75000\n@@fans\nnct6775|CPU fan|1240\nnct6775|Front fan|880\nnct6775|Rear fan|915\n"
+                "@@disks\nsda disk 80G DemoSSD 80\nsdb disk 3.6T DemoDisk 4TB\n@@smartctl\n/usr/sbin/smartctl\n@@end")
+    if command.startswith("sh -c 'for d in "):
+        return ("@@disk sda\nDevice Model: DemoSSD 80\nSMART overall-health self-assessment test result: PASSED\n"
+                "  9 Power_On_Hours 0x0032 099 099 000 Old_age Always - 8123\n194 Temperature_Celsius 0x0022 064 050 000 Old_age Always - 36\n"
+                "@@disk sdb\nDevice Model: DemoDisk 4TB\nSMART overall-health self-assessment test result: PASSED\n"
+                "  5 Reallocated_Sector_Ct 0x0033 100 100 010 Pre-fail Always - 0\n  9 Power_On_Hours 0x0032 080 080 000 Old_age Always - 17540\n"
+                "194 Temperature_Celsius 0x0022 112 099 000 Old_age Always - 38\n197 Current_Pending_Sector 0x0012 100 100 000 Old_age Always - 0\n")
+    if "ipmitool sdr" in command:
+        return ("CPU Temp         | 48 degrees C      | ok\nSystem Temp      | 31 degrees C      | ok\nFAN1             | 3100 RPM          | ok\n"
+                "FAN2             | 2900 RPM          | ok\n12V              | 12.19 Volts       | ok\n5V               | 5.04 Volts        | ok\n"
+                "PS1 Status       | 0x01              | ok\nPS2 Status       | 0x00              | nc\n")
+    if "ipmitool sel" in command:
+        return ("   1 | 11/02/2026 | 09:14:22 | Power Supply PS2 | Failure detected | Asserted\n"
+                "   2 | 11/02/2026 | 09:31:05 | Power Supply PS2 | Failure detected | Deasserted\n"
+                "   3 | 11/18/2026 | 02:00:41 | System Event | OEM System boot | Asserted\n")
+    if "ipmitool chassis" in command:
+        return "System Power         : on\nPower Overload       : false\nMain Power Fault     : false\nCooling/Fan Fault    : false\n"
+    if "docker ps" in command:
+        rows = [("portainer", "running", "Up 41 days", "portainer/portainer-ce:2.21", "9000/tcp", "0.4%", "88MiB"),
+                ("plex", "running", "Up 41 days", "plexinc/pms-docker:latest", "32400/tcp", "12.6%", "612MiB"),
+                ("homeassistant", "running", "Up 3 days", "homeassistant/home-assistant", "8123/tcp", "4.2%", "420MiB"),
+                ("nginx", "running", "Up 12 days", "nginx:1.27", "80/tcp, 443/tcp", "0.1%", "24MiB"),
+                ("backup-job", "exited", "Exited (0) 5 hours ago", "demo/backup:3", "", "", ""),
+                ("worker", "exited", "Exited (1) 2 hours ago", "demo/worker:1.8", "", "", "")]
+        ps = "\n".join(json.dumps({"Names": n, "State": s, "Status": st, "Image": i, "Ports": p, "ID": "a1b2c3d4e5f6"}) for n, s, st, i, p, _, _ in rows)
+        stats = "\n".join(json.dumps({"Name": n, "CPUPerc": c, "MemUsage": m + " / 16GiB"}) for n, s, _, _, _, c, m in rows if s == "running")
+        return f"@@ps\n{ps}\n@@stats\n{stats}\n@@end"
+    if "ufw" in command:
+        return ("Status: active\n\n     To                         Action      From\n     --                         ------      ----\n"
+                "[ 1] 22/tcp                     ALLOW IN    10.50.0.0/16\n[ 2] 80/tcp                     ALLOW IN    Anywhere\n"
+                "[ 3] 443/tcp                    ALLOW IN    Anywhere\n[ 4] 32400/tcp                  ALLOW IN    Anywhere\n"
+                "[ 5] 23/tcp                     DENY IN     Anywhere\n[ 6] 9000/tcp                   ALLOW IN    10.50.4.0/24\n")
+    return ""
+
+
+try:
+    mt.run_async = lambda command, done, timeout=30: root.after(60, lambda: done(0, fake_output(command), "", None))
+    for page, shot_name, text in (
+            (mt.page_docker, "m08b_docker", "🐳 Docker: containers with start, stop, restart and logs"),
+            (mt.page_hardware, "m08c_hardware", "Hardware: temperatures, fans and disk health"),
+            (mt.page_ipmi, "m08d_ipmi", "IPMI: sensors and event log from the management controller"),
+            (mt.page_firewall, "m08e_firewall", "Firewall: see and change ufw or firewalld rules"),
+            (mt.page_capture, "m08f_capture", "Capture: watch network packets live with tcpdump")):
+        play(0.1, text)
+        mt.book.select(page)
+        play(0.3)
+        if not page.loaded:
+            page.load()
+        play(1.2)
+        if page is mt.page_capture:
+            lines = []
+            for n in range(22):
+                src, dst, info = random.choice((
+                    ("10.50.4.21.51544", "10.50.2.20.22", "Flags [P.], seq 1:53, ack 1, win 501, length 52"),
+                    ("10.50.2.20.32400", "10.50.4.77.49210", "Flags [.], ack 1449, win 624, length 1448"),
+                    ("10.50.2.20.41822", "10.50.2.53.53", "UDP, length 41"),
+                    ("10.50.4.21.60022", "10.50.2.20.9000", "Flags [S], seq 3021, win 64240, length 0")))
+                lines.append(f"2026-11-24 09:41:{7 + n // 3:02d}.{random.randint(100000, 999999)} IP {src} > {dst}: {info}")
+            page.add_lines(lines)
+        play(1.2)
+        E.shot(shot_name)
+except Exception as e:
+    print("stats pages:", repr(e))
 clean()
 
 # network scan
@@ -380,6 +473,8 @@ try:
     import rc_record
     play(0.1, "Play back a recorded terminal session")
     rc_record.play_file(app, os.path.join(DEMO, "recordings", "demo-session.cast"))
+    play(0.5)
+    root.nametowidget(app.nb.select()).restart()
     play(4.5)
     E.shot("m19_recording_player")
 except Exception as e:
@@ -403,6 +498,19 @@ play(0.3)
 
 # modal prompts: backup, shortcuts
 modal_shot("m21_backup_password", app.backup_everything)
+try:
+    play(0.1, "Folder sync: keep your PCs the same through a shared folder")
+    app.open_sync()
+    play(0.6)
+    for w in root.winfo_children():
+        if isinstance(w, tk.Toplevel):
+            w.geometry("+%d+%d" % (root.winfo_rootx() + 480, root.winfo_rooty() + 260))
+            w.attributes("-topmost", True)
+    play(1.5)
+    E.shot("m21b_folder_sync")
+    clean()
+except Exception as e:
+    print("sync skipped:", e)
 try:
     play(0.1, "Help > Keyboard shortcuts")
     app.show_shortcuts()

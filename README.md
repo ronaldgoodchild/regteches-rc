@@ -1,4 +1,4 @@
-# REGTeches RC - Remote Connection Manager  v2.13.1
+# REGTeches RC - Remote Connection Manager  v2.19.0
 
 *Developed by Ronald Goodchild - REGTeches, Jacksonville FL*
 
@@ -8,7 +8,7 @@
 
 [![RC tour](screenshots/RC_tour.gif)](screenshots/RC_tour.mp4)
 
-**[▶ Watch the 1-minute video](screenshots/RC_tour.mp4)**
+**[▶ Watch the video tour](screenshots/RC_tour.mp4)**  ·  **[⬇ Download the latest zip](https://github.com/ronaldgoodchild/regteches-rc/releases/latest)**
 
 One window for every server you connect to (IP address or DNS name). Add and delete
 servers by mouse, group them, search them, and click the way in you want.
@@ -25,6 +25,7 @@ servers by mouse, group them, search them, and click the way in you want.
 
 RC has grown a lot since 2.0. In short (the full list, version by version, is in `CHANGELOG.md`):
 
+- **New in 2.14 - 2.19:** Docker, Hardware, IPMI, Firewall and packet Capture pages in Stats; WebDAV and S3 storage in the file manager; authenticator (two-step) logins; command suggestions; colour scheme import; terminal line numbers; move a tab into a split view; Devolutions import.
 - **Terminal:** split view with up to 9 terminals and Broadcast, saved workspaces, session recording and playback, 8 colour schemes and a font choice, quick commands and history, after-login scripts, Zmodem (`sz` / `rz`), Telnet and Serial (COM port) terminals, a multi-line paste check.
 - **Monitoring:** a live **Stats** view (CPU, memory, network, disks, processes, services, systemd logs), and **Glances** support so PCs and servers without SSH, including Windows, can be watched too.
 - **File manager:** right-click menu with copy / cut / paste on the server, clickable path trail, sortable columns, transfer queue with pause, resume and retry.
@@ -50,6 +51,38 @@ RC has grown a lot since 2.0. In short (the full list, version by version, is in
 **Drag-and-drop file manager** - SFTP, FTP and FTPS.
 
 ![The file manager](screenshots/05_file_manager.png)
+
+**Split view and broadcast** - up to 9 terminals in one tab.
+
+![Split view and broadcast](screenshots/15_split_view.png)
+
+**Live stats** - CPU, memory, network, processes and more.
+
+![Live stats](screenshots/16_stats.png)
+
+**Docker** - containers with start, stop, restart and logs.
+
+![Docker](screenshots/17_docker.png)
+
+**Hardware** - temperatures, fans and disk health.
+
+![Hardware](screenshots/18_hardware.png)
+
+**Firewall** - ufw and firewalld rules, with lock-out warnings.
+
+![Firewall](screenshots/19_firewall.png)
+
+**Packet capture** - live tcpdump, or save a .pcap.
+
+![Packet capture](screenshots/20_capture.png)
+
+**Network scan** - find machines and open ports.
+
+![Network scan](screenshots/21_network_scan.png)
+
+**Folder sync** - keep your PCs the same.
+
+![Folder sync](screenshots/22_folder_sync.png)
 
 **Seven colour themes** - pick one with the Colors button.
 
