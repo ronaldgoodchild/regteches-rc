@@ -8,7 +8,7 @@
 
 [![RC tour](screenshots/RC_tour.gif)](https://ronaldgoodchild.github.io/regteches-rc/#video)
 
-**[▶ Watch the video](https://ronaldgoodchild.github.io/regteches-rc/#video)**  ·  **[⬇ Download the latest zip](https://github.com/ronaldgoodchild/regteches-rc/releases/latest)**
+**[▶ Watch the video](https://ronaldgoodchild.github.io/regteches-rc/#video)**  ·  **[⬇ Download the latest zip](https://github.com/ronaldgoodchild/regteches-rc/releases/latest)**  ·  **[✨ See all features](https://ronaldgoodchild.github.io/regteches-rc/features.html)**
 
 One window for every server you connect to (IP address or DNS name). Add and delete
 servers by mouse, group them, search them, and click the way in you want.
