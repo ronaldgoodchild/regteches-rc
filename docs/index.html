@@ -122,6 +122,9 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
   nav.main.open{display:flex;position:absolute;top:100%;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 20px;flex-direction:column;margin:0}
   .twin{grid-template-columns:1fr}
 }
+.bar .btn{white-space:nowrap;flex:none}
+@media (max-width:640px){.bar{gap:8px;padding:10px 12px}.brand small{display:none}.bar .btn{padding:8px 12px}table{display:block;overflow-x:auto}code{overflow-wrap:anywhere}}
+@media (max-width:360px){.bar .btn span{display:none}.brand{font-size:.9rem;gap:6px}}
 @media print{header.top,aside.toc,.hero .videobox,#top{display:none}.manual{display:block}body{background:#fff;color:#000}}
 </style>
 </head>
@@ -143,7 +146,7 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
     </nav>
     <span class="spacer"></span>
     <button class="iconbtn" id="themeBtn" title="Light / dark">🌓</button>
-    <a class="btn" href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">⬇ Download</a>
+    <a class="btn" href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest" aria-label="Download">⬇ <span>Download</span></a>
   </div>
 </header>
 
