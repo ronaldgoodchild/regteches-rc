@@ -3,6 +3,14 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.19.2
+
+**New**
+- **Features page** (`manual\features.html`, also online): every feature grouped by area, with the total and a search box.
+
+**Fixed**
+- The web manual's Download button and wide tables fit narrow screens.
+
 ## 2.19.1
 
 **Fixed**
