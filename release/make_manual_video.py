@@ -4,6 +4,7 @@
 
 Title card + the recorded walk-through (frames/) + a captioned slide for each menu + closing card. Needs ffmpeg."""
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,9 @@ OUT = os.path.abspath(sys.argv[2])
 W, H = 1280, 720
 RATE = 4                    # recorded frames were grabbed a few times a second: show them at that pace
 NAVY_TOP, NAVY_BOTTOM = (11, 24, 56), (20, 44, 110)
+
+
+VERSION = re.search(r'APP_VERSION = "([^"]+)"', open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rc_manager.py"), encoding="utf-8").read()).group(1)
 
 
 def font(size, bold=True):
@@ -72,7 +76,7 @@ def add(img, seconds):
         n[0] += 1
 
 
-add(card("Every server. One window.", "REGTeches RC 2.13.1 - a short demonstration", "Sample data only: no real servers are shown"), 4)
+add(card("Every server. One window.", f"REGTeches RC {VERSION} - a short demonstration", "Sample data only: no real servers are shown"), 4)
 frames = sorted(f for f in os.listdir(os.path.join(SRC, "frames")) if f.endswith(".jpg"))
 for f in frames:
     shutil.copy(os.path.join(SRC, "frames", f), os.path.join(work, "v%05d.jpg" % n[0]))

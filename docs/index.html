@@ -177,7 +177,7 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
   <p class="sub">Everything below is built in. Nothing to install on your servers: RC only needs the logins you already use.</p>
   <div class="cards">
     <div class="card"><div class="ic">🖥</div><h3>A real SSH terminal</h3><p>Full-screen programs (vim, htop, tmux), 256 colours, scrollback, search, auto-reconnect, 8 colour schemes, session recording.</p></div>
-    <div class="card"><div class="ic">📁</div><h3>Two-pane file manager</h3><p>SFTP, FTP and FTPS with drag and drop, a transfer queue (pause, retry), folder sync, built-in editor, copy and paste on the server.</p></div>
+    <div class="card"><div class="ic">📁</div><h3>Two-pane file manager</h3><p>SFTP, FTP, FTPS, WebDAV and S3 with drag and drop, a transfer queue (pause, retry), folder sync, built-in editor, copy and paste on the server.</p></div>
     <div class="card"><div class="ic">📊</div><h3>Live server stats</h3><p>CPU, memory, network, disks, processes, services and listening ports, over SSH or from Glances (works for Windows PCs too).</p></div>
     <div class="card"><div class="ic">🧩</div><h3>Split view &amp; broadcast</h3><p>Up to 9 terminals in one tab. Type once, send to all. Save the layout as a workspace and reopen it in a click.</p></div>
     <div class="card"><div class="ic">🔎</div><h3>Network scan</h3><p>Find the machines on your network, their open ports, names and MAC addresses, and add one as a server in a click. Deep scan checks all 65,535 ports.</p></div>
@@ -185,6 +185,10 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
     <div class="card"><div class="ic">🌐</div><h3>Tunnels, proxies, jump hosts</h3><p>Reach private web pages and databases, go through SOCKS5 / HTTP proxies and bastion servers, Wake-on-LAN.</p></div>
     <div class="card"><div class="ic">⚡</div><h3>Faster every day</h3><p>Ctrl+K quick connect, quick commands and history, after-login scripts, snippets run on many servers at once, Zmodem.</p></div>
     <div class="card"><div class="ic">📝</div><h3>Notes &amp; documentation</h3><p>Markdown notes tied to servers. Import from PuTTY, WinSCP, MobaXterm, Xshell. Encrypted backup to move to a new PC.</p></div>
+    <div class="card"><div class="ic">🐳</div><h3>Docker, hardware &amp; IPMI</h3><p>Start, stop and read logs of containers. Watch temperatures, fans, disk health and server management sensors.</p></div>
+    <div class="card"><div class="ic">🧱</div><h3>Firewall &amp; packet capture</h3><p>View and change ufw / firewalld rules with lock-out warnings. Watch traffic with tcpdump or save a .pcap.</p></div>
+    <div class="card"><div class="ic">🔄</div><h3>Sync between PCs</h3><p>Servers, snippets and notes stay the same on all your PCs through an encrypted shared folder.</p></div>
+    <div class="card"><div class="ic">🔐</div><h3>Two-step logins</h3><p>Save an authenticator secret and RC answers the verification code prompt for you.</p></div>
     <div class="card"><div class="ic">🎨</div><h3>Seven themes</h3><p>Sky Blue, Sunset, Mint Fresh, Royal Dark, Neon Purple, Classic Dark and Classic Light.</p></div>
   </div>
 </div></section>
@@ -209,7 +213,7 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
 <p>RC is a single window that lists your servers on the left and opens whatever you click on the right, in tabs. If you can type an IP address, you can use it.</p>
 <h3 id="install">Install</h3>
 <ul>
-<li><b>Zip (easiest):</b> download <code>REGTeches_RC_v2.13.1.zip</code> from the <a href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">Releases page</a>, unzip it anywhere (Desktop, Documents, a USB stick) and double-click <code>RC.exe</code>. Nothing is installed. Your servers are saved next to <code>RC.exe</code>, so the whole folder can be moved or copied.</li>
+<li><b>Zip (easiest):</b> download <code>REGTeches_RC_v2.19.0.zip</code> from the <a href="https://github.com/ronaldgoodchild/regteches-rc/releases/latest">Releases page</a>, unzip it anywhere (Desktop, Documents, a USB stick) and double-click <code>RC.exe</code>. Nothing is installed. Your servers are saved next to <code>RC.exe</code>, so the whole folder can be moved or copied.</li>
 <li><b>Scoop:</b> <code>scoop bucket add regteches https://github.com/ronaldgoodchild/scoop-regteches</code> then <code>scoop install rc</code>. Update with <code>scoop update rc</code>; your servers are kept between updates.</li>
 <li><b>From source:</b> install Python 3.11 or newer, run <code>pip install -r requirements.txt</code>, then double-click <code>RC.bat</code> (or run <code>python rc_manager.py</code>).</li>
 </ul>
@@ -345,6 +349,15 @@ footer.foot{border-top:1px solid var(--line);padding:30px 20px 50px;color:var(--
 </ul>
 <h3 id="term-look">Colours, font and clipboard</h3>
 <p>Right-click a terminal (or use the <em>View</em> menu) for <b>Colours</b> (Dark, Light, Solarized Dark, Dracula, Monokai, Nord, Gruvbox Dark, Green on black), <b>Font…</b> (fixed-width fonts, with a sample), <b>Copy when I select text</b>, <b>Right-click pastes (no menu)</b>, <b>Middle-click pastes</b> and <b>Save output to a file…</b>. Settings live in <code>terminal.json</code>.</p>
+<h3 id="line-numbers">Line numbers, timestamps and suggestions</h3>
+<figure class="shot"><img src="assets/m04b_line_numbers.png" alt="Line numbers in the terminal" loading="lazy"><figcaption>A terminal with line numbers switched on.</figcaption></figure>
+<ul>
+<li><b>Line numbers:</b> right-click a terminal &gt; <em>Show line numbers</em>. They count the lines RC keeps (scrollback and screen), to help you find your place.</li>
+<li><b>Suggestions:</b> <kbd>Ctrl</kbd>+<kbd>Space</kbd> lists remembered commands that match what you typed. <kbd>Enter</kbd> or <kbd>Tab</kbd> fills the line without running it.</li>
+<li><b>Colour schemes:</b> <em>View &gt; Terminal colours &gt; Import a colour scheme…</em> reads iTerm2, Windows Terminal or simple JSON schemes.</li>
+<li><b>Timestamps:</b> right-click &gt; <em>Timestamp every line in the log file</em>.</li>
+<li><b>Move a tab into a split view:</b> right-click an SSH tab, or drag it down into the window. The session is reopened in the pane.</li>
+</ul>
 <h3 id="quick-panel">⚡ Quick commands and History</h3>
 <figure class="shot"><img src="assets/m05_quick_panel.png" alt="Quick commands panel" loading="lazy"><figcaption>The ⚡ Quick panel beside a terminal: Commands and History.</figcaption></figure>
 <ul>
@@ -398,6 +411,9 @@ assword =&gt; ${password}
 <li>FTPS accepts self-signed certificates (usual on home servers) and supports port 990. Plain FTP sends the password unencrypted: prefer SFTP or FTPS.</li>
 </ul>
 
+<h3 id="cloud">WebDAV and S3 storage</h3>
+<p>On the server's <em>Connections</em> page set <b>File transfer</b> to <b>WebDAV</b>, <b>WebDAVS</b>, <b>S3</b> or <b>S3 (http)</b>, then use the usual <b>Files</b> button. WebDAV covers Nextcloud, ownCloud and NAS boxes. S3 covers Amazon S3, MinIO, Wasabi, Backblaze B2 and compatible storage (set the <b>S3 region</b> if it is not <code>us-east-1</code>). https certificates are not checked, so self-signed servers work. The file panes also support type-ahead, symbolic links and choosable columns.</p>
+
 <h2 id="stats">Live stats</h2>
 <p>Click <b>📊 Stats</b> to watch a server. RC logs in over SSH with the saved login or key and refreshes every 2, 5 (default), 10, 30 or 60 seconds. Nothing is installed or changed on the server: one read-only script reads <code>/proc</code>, <code>df</code>, <code>ps</code> and <code>ss</code>.</p>
 <figure class="shot"><img src="assets/m08_stats.png" alt="Stats tab" loading="lazy"><figcaption>Stats for a Docker host. (Sample numbers in this picture.)</figcaption></figure>
@@ -410,6 +426,21 @@ assword =&gt; ${password}
 <li><b>Pause</b>, <b>⟳ Now</b> and the interval are at the top. If the link drops the tab reconnects by itself; if a server keeps refusing logins RC waits longer between tries (up to a minute) and says when it will try again.</li>
 <li>Works on Linux, Raspberry Pi, Synology / QNAP and other servers that have <code>/proc</code>. A Windows SSH server answers "not supported": use Glances (below), Remote Desktop or PowerShell there.</li>
 </ul>
+<h3 id="docker">Docker</h3>
+<figure class="shot"><img src="assets/m08b_docker.png" alt="Docker page" loading="lazy"><figcaption>The Docker page. (Sample data.)</figcaption></figure>
+<p>Lists a server's containers with state, CPU, memory, image and ports. Select one to start, stop, restart or remove it (RC asks before stop, restart and remove), or double-click for its logs. Uses <code>docker</code> over SSH, with <code>sudo -n</code> if needed.</p>
+<h3 id="hardware">Hardware and IPMI</h3>
+<figure class="shot"><img src="assets/m08c_hardware.png" alt="Hardware page" loading="lazy"><figcaption>Temperatures, fans and disk health. (Sample data.)</figcaption></figure>
+<p><b>Hardware</b> shows temperatures, fans and machine details, and on request SMART disk health (<code>smartmontools</code>, needs root or passwordless sudo). Read-only.</p>
+<figure class="shot"><img src="assets/m08d_ipmi.png" alt="IPMI page" loading="lazy"><figcaption>IPMI sensors from a server management controller. (Sample data.)</figcaption></figure>
+<p><b>IPMI</b> shows sensors, the event log and chassis status through <code>ipmitool</code>. Most PCs have no IPMI and the page says so.</p>
+<h3 id="firewall">Firewall</h3>
+<figure class="shot"><img src="assets/m08e_firewall.png" alt="Firewall page" loading="lazy"><figcaption>ufw rules. (Sample data.)</figcaption></figure>
+<p>Lists the server's firewall rules. With <b>ufw</b> you can add or delete rules and turn it on or off; with <b>firewalld</b> add or remove ports and services; nftables and iptables are read-only. Every change asks first, and RC warns if it could cut your own SSH connection.</p>
+<h3 id="capture">Packet capture</h3>
+<figure class="shot"><img src="assets/m08f_capture.png" alt="Capture page" loading="lazy"><figcaption>Live packet list. (Sample data.)</figcaption></figure>
+<p>Runs <code>tcpdump</code> on the server. Choose an interface, an optional filter and a limit, then <b>Show packets</b> or <b>Record to a .pcap file</b> for Wireshark. Needs tcpdump and root or passwordless sudo.</p>
+<p>These pages are not shown for servers read through Glances.</p>
 <h3 id="glances">Stats from Glances (PCs and servers with no SSH)</h3>
 <p>If a machine already runs <a href="https://nicolargo.github.io/glances">Glances</a> in web mode (<code>glances -w</code>, port 61208), open that server's <b>Glances</b> page and click <b>🔎 Detect / test Glances</b>. RC finds it and ticks <em>Use Glances for this server's Stats</em> itself. The Stats tab then reads Glances' REST API, so it works for <b>Windows PCs and devices you have no SSH login for</b>. You also get a <b>Containers</b> tab (Docker / Podman) and temperature sensors. Not available in this mode: sending signals, the Services list and the Listening ports list. Set the port, a username and password (if Glances was started with <code>--password</code>) and https (if started with <code>--enable-https</code>; self-signed certificates are accepted).</p>
 
@@ -455,6 +486,8 @@ assword =&gt; ${password}
 <li><b>Keys are better where they work</b> (an SSH key file or ssh-agent): then nothing needs saving. For a key with a passphrase put the passphrase in the Password box.</li>
 <li>Anyone who can sign in to your Windows account can use your saved logins, as with any saved-password feature. Lock your PC.</li>
 </ul>
+<h3 id="totp">Two-step logins (authenticator codes)</h3>
+<p>For servers that ask for a Google Authenticator style code: on the <em>Login</em> page paste the secret (or the <code>otpauth://</code> link) into <b>Authenticator secret</b>. It is saved encrypted, and RC answers the password and verification code prompts. Login scripts can use <code>${totp}</code>. Guard the secret like a password.</p>
 <h3 id="identities">Identities</h3>
 <p><em>Tools &gt; Credentials &gt; Identities</em>. An identity is a reusable login: a name, a username and either a password, a key file, or "SSH agent / default keys". Pick it on a server's Login page under <b>Saved login (identity)</b>. That server then uses the identity <em>instead of</em> its own username and password, so changing a password once changes it for every server that uses it. Deleting an identity sends its servers back to their own settings.</p>
 <figure class="shot"><img src="assets/m11_identities.png" alt="Identities" loading="lazy"><figcaption>The Identities tab.</figcaption></figure>
@@ -488,6 +521,10 @@ assword =&gt; ${password}
 <li>A safety copy of your server list is saved first (<code>hosts.json.before-restore-&lt;time&gt;</code>).</li>
 </ul>
 <div class="tip"><b>Simplest alternative:</b> RC keeps all its data next to <code>RC.exe</code>, so copying the whole folder to a USB stick also works for everything except saved passwords.</div>
+
+<h3 id="sync">Sync through a folder</h3>
+<figure class="shot"><img src="assets/m21b_folder_sync.png" alt="Folder sync" loading="lazy"><figcaption>Folder sync settings.</figcaption></figure>
+<p><em>File &gt; Backup &gt; Sync through a folder</em> keeps servers, snippets, workspaces, identities, proxies, notes and trusted host keys the same on several PCs. Use the same folder (OneDrive, Dropbox, a network share) and the same sync password on each. Each PC writes its own encrypted file, the newest change wins, and deletions carry across. SSH key files and command history are not synced.</p>
 
 <h2 id="look">Themes, preferences and shortcuts</h2>
 <h3 id="themes">Colour themes</h3>
@@ -692,6 +729,13 @@ assword =&gt; ${password}
    ['m06_split_view','Split view','Four servers in one tab'],
    ['m07_file_manager','File manager','Two panes, drag and drop, transfer queue'],
    ['m08_stats','Live stats','CPU, memory, network, disks, processes'],
+   ['m08b_docker','Docker','Start, stop, restart and read logs'],
+   ['m08c_hardware','Hardware','Temperatures, fans and disk health'],
+   ['m08d_ipmi','IPMI','Server management sensors'],
+   ['m08e_firewall','Firewall','ufw and firewalld rules'],
+   ['m08f_capture','Packet capture','Live tcpdump or a .pcap file'],
+   ['m04b_line_numbers','Line numbers','Find your place in long output'],
+   ['m21b_folder_sync','Folder sync','Keep your PCs the same'],
    ['m09_network_scan','Network scan','Find machines and open ports'],
    ['m10_notes','Notes','Markdown notes tied to servers'],
    ['m11_identities','Identities','One login shared by many servers'],

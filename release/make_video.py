@@ -5,6 +5,7 @@ cross-fades, closing card. Needs ffmpeg on PATH.
 
 The slides are drawn here with Pillow (nothing real is shown: the screenshots come from FAKE demo data)."""
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -18,9 +19,11 @@ W, H, FPS, FADE = 1280, 720, 30, 0.7
 NAVY_TOP, NAVY_BOTTOM = (11, 24, 56), (20, 44, 110)
 RED = (183, 28, 28)
 
+VERSION = re.search(r'APP_VERSION = "([^"]+)"', open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rc_manager.py"), encoding="utf-8").read()).group(1)
+
 # (picture or None, title, subtitle, seconds)
 SLIDES = [
-    (None, "REGTeches RC 2.0", "Every server. One window.", 4.0),
+    (None, "REGTeches RC", "Every server. One window.", 4.0),
     ("01_home.png", "Know what is up at a glance", "Live status dots, favorites and recent servers on the Overview", 5.0),
     ("03_docker_host_connections.png", "Every way in, one click", "SSH, Files, Remote Desktop, VNC, RustDesk, Web, PowerShell and more", 4.5),
     ("04_ssh_terminal.png", "A real SSH terminal", "Full-screen programs, colours, scrollback, font zoom, auto-reconnect", 5.0),
@@ -29,7 +32,14 @@ SLIDES = [
     ("07_snippets.png", "Saved commands", "Run your favourite commands on any server", 4.0),
     ("08_key_setup.png", "One-click key login", "Set up passwordless SSH for the whole lab", 4.0),
     ("09_quick_connect.png", "Ctrl+K quick connect", "Type a few letters, press Enter", 4.0),
-    ("14_help_guide.png", "Built-in guide", "Help opens a formatted guide in your browser", 4.5),
+    ("15_split_view.png", "Split view and broadcast", "Up to 9 terminals in one tab: type once, send to all", 4.0),
+    ("16_stats.png", "Live server stats", "CPU, memory, network, disks, processes and ports", 4.0),
+    ("17_docker.png", "Docker containers", "See, start, stop and restart containers, read their logs", 4.0),
+    ("18_hardware.png", "Hardware and IPMI", "Temperatures, fans, disk health and server sensors", 4.0),
+    ("19_firewall.png", "Firewall rules", "View and change ufw and firewalld rules, with lock-out warnings", 4.0),
+    ("20_capture.png", "Packet capture", "Watch traffic live with tcpdump, or save a .pcap for Wireshark", 4.0),
+    ("21_network_scan.png", "Network scan", "Find machines and open ports, add them as servers", 4.0),
+    ("22_folder_sync.png", "Sync between PCs", "Encrypted sync of servers and notes through a shared folder", 4.0),
     ("13_theme_gallery.png", "Seven colour themes", "Light, dark, neon - make it yours", 4.5),
     (None, "Free and open source", "MIT license  ·  github.com/ronaldgoodchild/regteches-rc", 5.0),
 ]
@@ -68,7 +78,7 @@ def card(title, sub, closing=False):
     x = (W - total) / 2
     d.text((x, 150), reg, font=f, fill="white")
     d.text((x + d.textlength(reg, font=f), 150), teches, font=f, fill=(255, 205, 210))
-    centered(d, title if closing else "Remote Connection Manager  2.0", 310, font(54), "white")
+    centered(d, title if closing else f"Remote Connection Manager  {VERSION}", 310, font(54), "white")
     centered(d, sub, 400, font(34, False), (200, 215, 245))
     centered(d, "Developed by Ronald Goodchild  ·  Jacksonville, FL", 640, font(26, False), (150, 170, 215))
     return img
@@ -90,7 +100,7 @@ def slide(pic, title, sub):
     shadow = shadow.filter(ImageFilter.GaussianBlur(14))
     img.paste(shadow, (x - 30, y - 30), shadow)
     img.paste(shot, (x, y))
-    d.text((W - 330, H - 34), "REGTeches RC 2.0  ·  free & open source", font=font(18, False), fill=(150, 170, 215))
+    d.text((W - 330, H - 34), f"REGTeches RC {VERSION}  ·  free & open source", font=font(18, False), fill=(150, 170, 215))
     return img
 
 
