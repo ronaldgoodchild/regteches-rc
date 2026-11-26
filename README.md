@@ -6,9 +6,9 @@
 
 **Free and open source (MIT).** SSH terminal, file manager, Remote Desktop, VNC, RustDesk, tunnels and live server status - all in one window.
 
-[![RC tour](screenshots/RC_tour.gif)](screenshots/RC_tour.mp4)
+[![RC tour](screenshots/RC_tour.gif)](https://ronaldgoodchild.github.io/regteches-rc/#video)
 
-**[▶ Watch the video tour](screenshots/RC_tour.mp4)**  ·  **[⬇ Download the latest zip](https://github.com/ronaldgoodchild/regteches-rc/releases/latest)**
+**[▶ Watch the video](https://ronaldgoodchild.github.io/regteches-rc/#video)**  ·  **[⬇ Download the latest zip](https://github.com/ronaldgoodchild/regteches-rc/releases/latest)**
 
 One window for every server you connect to (IP address or DNS name). Add and delete
 servers by mouse, group them, search them, and click the way in you want.
