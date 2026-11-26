@@ -3,6 +3,11 @@
 Newest first. The version number lives in one place, `APP_VERSION` in `rc_manager.py`; the window title, status bar,
 About box, guide page, log file, `RC.exe` file properties and the release file names all follow it.
 
+## 2.19.1
+
+**Fixed**
+- **Stats view tab names** are no longer cut off: the tabs now take the largest size that fits the window and adjust when it is resized.
+
 ## 2.19.0
 
 **New**

@@ -14,6 +14,7 @@ import time
 import tkinter as tk
 from collections import deque
 from tkinter import messagebox, ttk
+from tkinter import font as tkfont
 
 import rc_manager as core
 
@@ -53,6 +54,19 @@ class Unsupported(Exception):
 
 
 # ─── parsing (pure functions) ────────────────────────────────────────────────
+
+TAB_LEVELS = ((20, 10), (14, 10), (9, 10), (7, 9), (4, 9), (3, 8), (1, 7))   # (side padding, font size), roomiest first
+
+
+def pick_tab_level(names, width, measure):
+    """Index into TAB_LEVELS of the first size at which all tab names fit in `width` pixels; measure(text, size) -> pixels.
+    The last level is returned when nothing fits."""
+    for i, (padx, size) in enumerate(TAB_LEVELS):
+        # 6 px per tab for borders; the selected tab is 2 px wider on each side
+        if sum(measure(n, size) + 2 * padx + 6 for n in names) + 4 <= width:
+            return i
+    return len(TAB_LEVELS) - 1
+
 
 def split_sections(text):
     """'@@name' marker lines split the script output into {name: [lines]}."""
@@ -566,8 +580,11 @@ class MonitorTab(ttk.Frame):
         self.sys_big, self.sys_sub = tk.StringVar(value="-"), tk.StringVar()
         self.tile(tiles, 3, "System", self.sys_big, self.sys_sub, big_size=12)
 
-        self.book = ttk.Notebook(self)
+        self.book = ttk.Notebook(self, style="Stats.TNotebook")
         self.book.pack(fill="both", expand=True, padx=6, pady=(2, 6))
+        self.tab_level = self.tab_style = None
+        self.book.bind("<Configure>", self.fit_tabs, add="+")
+        self.book.bind("<<ThemeChanged>>", self.refit_tabs, add="+")
         self.build_processes()
         self.build_disks()
         self.build_network()
@@ -849,6 +866,39 @@ class MonitorTab(ttk.Frame):
         theme = getattr(self.app, "theme", None)
         if theme:
             theme.paint(widget)
+
+    # ── tab names ──
+    def refit_tabs(self, _e=None):
+        self.after_idle(self.fit_tabs)      # fit_tabs only restyles when something differs: restyling raises this event again
+
+    def fit_tabs(self, _e=None):
+        """ttk squeezes tabs that do not fit and cuts their names off, so use the roomiest tab size that fits the width."""
+        try:
+            width = self.book.winfo_width()
+            if width <= 1:
+                return
+            names = []
+            for t in self.book.tabs():
+                text = self.book.tab(t, "text")
+                names.append(text.strip())
+                if text != names[-1]:      # the room around a name comes from the tab padding, not from spaces
+                    self.book.tab(t, text=names[-1])
+            theme = getattr(self.app, "theme", None)
+            plain = getattr(theme, "name", "") == "Classic Light"
+            family = tkfont.nametofont("TkDefaultFont").actual("family") if plain else "Segoe UI"
+            weight = "normal" if plain else "bold"
+            level = pick_tab_level(names, width, lambda text, size: tkfont.Font(
+                root=self, family=family, size=size, weight=weight).measure(text))
+            style = ttk.Style(self)
+            key = (style.theme_use(), level)
+            if key == self.tab_style:       # each ttk theme keeps its own style settings, so remember which one was set
+                return
+            self.tab_style, self.tab_level = key, level
+            padx, size = TAB_LEVELS[level]
+            style.configure("Stats.TNotebook.Tab", padding=(padx, 5), font=(family, size, weight))
+            style.map("Stats.TNotebook.Tab", padding=[("selected", (padx + 2, 8))])
+        except tk.TclError:
+            pass
 
     def tab_changed(self, _e=None):
         try:
