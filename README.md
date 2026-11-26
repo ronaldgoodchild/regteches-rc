@@ -4,7 +4,7 @@
 
 ![REGTeches RC - Remote Connection Manager](screenshots/00_hero_facebook.png)
 
-**Free and open source (MIT).** SSH terminal, file manager, Remote Desktop, VNC, RustDesk, tunnels and live server status - all in one window.
+**A free, portable Windows alternative to juggling PuTTY, WinSCP and Remote Desktop**, for home labbers, IT technicians and small-business admins. SSH terminal, file manager, Remote Desktop, VNC, RustDesk, tunnels and live server status in one window. No installer. Open source (MIT).
 
 [![RC tour](screenshots/RC_tour.gif)](https://ronaldgoodchild.github.io/regteches-rc/#video)
 
