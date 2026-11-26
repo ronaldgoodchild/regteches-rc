@@ -345,5 +345,25 @@ class WorkerTests(unittest.TestCase):
         self.assertFalse(tab.thread.is_alive())
 
 
+class TabSizeTests(unittest.TestCase):
+    NAMES = ["Processes", "Disks", "Network", "Listening ports", "Services", "System", "Docker", "Firewall", "Capture", "Hardware", "IPMI"]
+
+    @staticmethod
+    def measure(text, size):
+        return len(text) * size
+
+    def test_wide_window_keeps_the_roomy_size(self):
+        self.assertEqual(mon.pick_tab_level(self.NAMES, 5000, self.measure), 0)
+
+    def test_narrower_windows_use_smaller_tabs_that_still_fit(self):
+        level = mon.pick_tab_level(self.NAMES, 1000, self.measure)
+        padx, size = mon.TAB_LEVELS[level]
+        self.assertGreater(level, 0)
+        self.assertLessEqual(sum(self.measure(n, size) + 2 * padx + 6 for n in self.NAMES) + 4, 1000)
+
+    def test_very_narrow_window_gets_the_smallest_size(self):
+        self.assertEqual(mon.pick_tab_level(self.NAMES, 100, self.measure), len(mon.TAB_LEVELS) - 1)
+
+
 if __name__ == "__main__":
     unittest.main()
